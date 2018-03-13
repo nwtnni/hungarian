@@ -1,11 +1,13 @@
 extern crate fnv;
+extern crate fixedbitset;
 
 use fnv::FnvHashMap;
+use fixedbitset::FixedBitSet;
 
 #[derive(Debug, Eq, PartialEq)]
 enum Type { Star, Prime }
 
-pub fn hungarian(mut matrix: Vec<Vec<i16>>) -> FnvHashMap<usize, usize> {
+pub fn hungarian(mut matrix: Vec<Vec<i16>>) -> Vec<usize> {
     let rows = matrix.len();
     let cols = matrix[0].len();
     let target = if rows < cols { rows } else { cols };
@@ -52,8 +54,8 @@ pub fn hungarian(mut matrix: Vec<Vec<i16>>) -> FnvHashMap<usize, usize> {
             if col_cover.iter().filter(|&&cov| cov).count() == target {
                 return mask.into_iter()
                     .filter(|&(_, ref t)| t == &Type::Star)
-                    .map(|((row, col), _)| (row, col))
-                    .collect::<FnvHashMap<_, _>>()
+                    .map(|((_, col), _)| col)
+                    .collect::<Vec<_>>()
             }
         }
 
@@ -157,6 +159,17 @@ mod tests {
             vec![1, 1, 1],
             vec![1, 1, 1],
         ];
+        hungarian(matrix);
+    }
+
+    #[test]
+    fn test_increasing() {
+        let matrix = vec![
+            vec![1,   2,  3,  4],
+            vec![5,   6,  7,  8],
+            vec![9,  10, 11, 12],
+            vec![13, 14, 15, 16],
+        ];
         println!("{:#?}", hungarian(matrix));
     }
 
@@ -254,7 +267,7 @@ mod tests {
             vec![73,253,389,253,253,539,539,539,253,36,36,0,0,0],
             vec![73,267,270,267,322,352,352,352,322,231,231,0,0,0],
         ];
-        println!("{:?}", hungarian(matrix));
+        hungarian(matrix);
     }
 
     #[test]

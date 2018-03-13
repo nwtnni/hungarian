@@ -5,3 +5,4 @@ authors = ["Newton Ni <nwtnni@gmail.com>"]
 
 [dependencies]
 fnv = "1.0.6"
+fixedbitset = "0.1.8"
