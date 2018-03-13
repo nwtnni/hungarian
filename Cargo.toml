@@ -1,0 +1,7 @@
+[package]
+name = "hungarian"
+version = "0.1.0"
+authors = ["Newton Ni <nwtnni@gmail.com>"]
+
+[dependencies]
+fnv = "1.0.6"
