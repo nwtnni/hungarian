@@ -76,4 +76,69 @@ Worst Case               |  Generic Case
 C(i, j) = (i + 1)(j + 1) |  C(i, j) = (i * width) + j
 ```
 
-TODO
+#### Criterion Results
+
+| Cost Matrix | Matrix Size | Average Runtime |
+-----------------------------------------------
+| Generic     |  5 x  5     |   2.54 us       |
+| Generic     | 10 x 10     |  16.31 us       |
+| Generic     | 25 x 25     | 355.27 us       |
+| Generic     | 50 x 50     |   4.12 ms       |
+| Worst-Case  |  5 x  5     |   3.21 us       |
+| Worst-Case  | 10 x 10     |  35.77 us       |
+| Worst-Case  | 25 x 25     |   1.14 ms       |
+| Worst-Case  | 50 x 50     |  18.59 ms       |
+
+```
+Benchmarking hungarian_NxN/5
+Benchmarking hungarian_NxN/5: Warming up for 3.0000 s
+Benchmarking hungarian_NxN/5: Collecting 100 samples in estimated 5.0094 s (2.0M iterations)
+Benchmarking hungarian_NxN/5: Analyzing
+hungarian_NxN/5         time:   [2.5008 us 2.5366 us 2.5796 us]
+
+Benchmarking hungarian_NxN/10
+Benchmarking hungarian_NxN/10: Warming up for 3.0000 s
+Benchmarking hungarian_NxN/10: Collecting 100 samples in estimated 5.0369 s (308k iterations)
+Benchmarking hungarian_NxN/10: Analyzing
+hungarian_NxN/10        time:   [16.196 us 16.311 us 16.447 us]
+
+Benchmarking hungarian_NxN/25
+Benchmarking hungarian_NxN/25: Warming up for 3.0000 s
+Benchmarking hungarian_NxN/25: Collecting 100 samples in estimated 5.4580 s (15k iterations)
+Benchmarking hungarian_NxN/25: Analyzing
+hungarian_NxN/25        time:   [355.27 us 357.79 us 360.33 us]
+
+Benchmarking hungarian_NxN/50
+Benchmarking hungarian_NxN/50: Warming up for 3.0000 s
+Benchmarking hungarian_NxN/50: Collecting 100 samples in estimated 21.105 s (5050 iterations)
+Benchmarking hungarian_NxN/50: Analyzing
+hungarian_NxN/50        time:   [4.1241 ms 4.1487 ms 4.1749 ms]
+
+Benchmarking hungarian_worst_case_NxN/5
+Benchmarking hungarian_worst_case_NxN/5: Warming up for 3.0000 s
+Benchmarking hungarian_worst_case_NxN/5: Collecting 100 samples in estimated 5.0095 s (1.6M iterations)
+Benchmarking hungarian_worst_case_NxN/5: Analyzing
+hungarian_worst_case_NxN/5
+                        time:   [3.2128 us 3.2256 us 3.2401 us]
+
+Benchmarking hungarian_worst_case_NxN/10
+Benchmarking hungarian_worst_case_NxN/10: Warming up for 3.0000 s
+Benchmarking hungarian_worst_case_NxN/10: Collecting 100 samples in estimated 5.1088 s (141k iterations)
+Benchmarking hungarian_worst_case_NxN/10: Analyzing
+hungarian_worst_case_NxN/10
+                        time:   [35.767 us 35.975 us 36.226 us]
+
+Benchmarking hungarian_worst_case_NxN/25
+Benchmarking hungarian_worst_case_NxN/25: Warming up for 3.0000 s
+Benchmarking hungarian_worst_case_NxN/25: Collecting 100 samples in estimated 5.7591 s (5050 iterations)
+Benchmarking hungarian_worst_case_NxN/25: Analyzing
+hungarian_worst_case_NxN/25
+                        time:   [1.1416 ms 1.1525 ms 1.1652 ms]
+
+Benchmarking hungarian_worst_case_NxN/50
+Benchmarking hungarian_worst_case_NxN/50: Warming up for 3.0000 s
+Benchmarking hungarian_worst_case_NxN/50: Collecting 100 samples in estimated 91.351 s (5050 iterations)
+Benchmarking hungarian_worst_case_NxN/50: Analyzing
+hungarian_worst_case_NxN/50
+                        time:   [18.592 ms 18.762 ms 18.942 ms]
+```
