@@ -4,7 +4,7 @@
 
 A simple Rust implementation of the Hungarian (or Kuhn–Munkres) algorithm.
 
-Derived and modified from ![this great explanation](http://csclab.murraystate.edu/~bob.pilgrim/445/munkres.html).
+Derived and modified from [this great explanation](http://csclab.murraystate.edu/~bob.pilgrim/445/munkres.html).
 
 ## Usage
 
@@ -45,7 +45,7 @@ fn main() {
 
 ## Notes
 
-There's only one dependency (fixedbitset) and one source file in this crate.
+There's only one dependency ([fixedbitset](https://github.com/bluss/fixedbitset)) and one source file in this crate.
 
 Instead of using splitting logic across files and helper functions, I tried to simplify and
 condense the above explanation into a single, simple function while maintaining correctness.
@@ -60,20 +60,20 @@ Benchmarks were obtained using Criterion.rs, with the following two
 types of cost matrices:
 
 ```
-Worst Case                Generic Case
-                          
--------------             -------------
-| 1 | 2 | 3 | ...         | 1 | 2 | 3 |
--------------             -------------
-| 2 | 4 | 6 | ...         | 4 | 5 | 6 |
--------------             -------------
-| 3 | 6 | 9 | ...         | 7 | 8 | 9 |
--------------             -------------
-  .   .   .           
-  .   .   .           
-  .   .   .                  
-
-C(i, j) = (i + 1)(j + 1)  C(i, j) = (i * width) + j
+Worst Case               |  Generic Case
+                         |  
+-------------            |  -------------
+| 1 | 2 | 3 | ...        |  | 1 | 2 | 3 |
+-------------            |  -------------
+| 2 | 4 | 6 | ...        |  | 4 | 5 | 6 |
+-------------            |  -------------
+| 3 | 6 | 9 | ...        |  | 7 | 8 | 9 |
+-------------            |  -------------
+  .   .   .              |  
+  .   .   .              |   
+  .   .   .              |     
+                         |  
+C(i, j) = (i + 1)(j + 1) |  C(i, j) = (i * width) + j
 ```
 
 TODO
