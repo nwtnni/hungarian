@@ -79,7 +79,7 @@ C(i, j) = (i + 1)(j + 1) |  C(i, j) = (i * width) + j
 #### Criterion Results
 
 | Cost Matrix | Matrix Size | Average Runtime |
------------------------------------------------
+|-------------|-------------|-----------------|
 | Generic     |  5 x  5     |   2.54 us       |
 | Generic     | 10 x 10     |  16.31 us       |
 | Generic     | 25 x 25     | 355.27 us       |
