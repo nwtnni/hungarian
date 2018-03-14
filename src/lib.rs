@@ -25,8 +25,9 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
     // Star zeros
     for i in 0..h {
         for j in 0..w {
-            if matrix[index!(w, i, j)] == 0 && !(row_cover[i] || col_cover[j]) {
-                stars.insert(index!(w, i, j));
+            let index = index!(w, i, j);
+            if matrix[index] == 0 && !(row_cover[i] || col_cover[j]) {
+                stars.insert(index);
                 row_cover.insert(i);
                 col_cover.insert(j);
             }
@@ -42,14 +43,7 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
 
         // Count cover
         if verify {
-            for i in 0..h {
-                for j in 0..w {
-                    if stars[index!(w, i, j)] {
-                        col_cover.insert(j);
-                    }
-                }
-            }
-
+            stars.ones().for_each(|index| col_cover.insert(index % w));
             if col_cover.count_ones(..) == target {
                 return stars.ones().map(|index| index % w).collect()
             }
@@ -98,7 +92,7 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         let starred = (0..w).filter(|&j| {
             let index = index!(w, i, j);
             stars[index] && matrix[index] == 0
-        }).nth(0);
+        }).next();
 
         if let Some(adj) = starred {
             row_cover.insert(i);
@@ -110,19 +104,20 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         // Alternating path of Stars and Primes
         let mut path = vec![(i, j)];
         loop {
-            let (_, prev_col) = path[path.len() - 1];
+            let (_, j) = path[path.len() - 1];
             let next_star = (0..h).filter(|&i| {
-                stars[index!(w, i, prev_col)]
-            }).nth(0);
+                stars[index!(w, i, j)]
+            }).next();
 
             if let None = next_star { break }
-            let star_row = next_star.unwrap();
-            path.push((star_row, prev_col));
+            let i = next_star.unwrap();
+            path.push((i, j));
 
-            let prime_col = (0..w).filter(|&col| {
-                primes[index!(w, star_row, col)]
-            }).nth(0).unwrap();
-            path.push((star_row, prime_col));
+            let next_prime = (0..w).filter(|&j| {
+                primes[index!(w, i, j)]
+            }).next();
+
+            path.push((i, next_prime.expect("Should always exist")));
         }
 
         // Augment path
