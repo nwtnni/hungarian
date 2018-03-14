@@ -7,7 +7,7 @@ repository = "https://github.com/nwtnni/hungarian"
 readme = "README.md"
 keywords = ["hungarian", "munkres", "kuhn-munkres", "algorithms", "assignment"]
 categories = ["algorithms"]
-license = "MIT License"
+license = "MIT"
 
 [badges]
 travis-ci = { repository = "nwtnni/hungarian" }
