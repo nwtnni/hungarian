@@ -380,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn test_worst_case() {
+    fn test_stress() {
         for max in 1..100 {
             let mut matrix = vec![0; max * max];
             let mut n: u64 = 0;
@@ -396,13 +396,13 @@ mod tests {
     }
 
     #[test]
-    fn test_stress() {
-        for max in 1..100 {
+    fn test_worst_case() {
+        for max in 1..50 {
             let mut matrix = vec![0; max * max];
             
             for i in 0..max {
                 for j in 0..max {
-                    matrix[index!(max, i, j)] = (i*j) as u64;
+                    matrix[index!(max, i, j)] = ((i + 1)*(j + 1)) as u64;
                 }
             }
             assert_eq!(hungarian(&matrix, max, max), (0..max).rev().collect::<Vec<_>>());
@@ -413,10 +413,12 @@ mod tests {
     fn test_large() {
         let max = 250;
         let mut matrix = vec![0; max * max];
+        let mut n: u64 = 0;
         
         for i in 0..max {
             for j in 0..max {
-                matrix[index!(max, i, j)] = (i*j) as u64;
+                matrix[index!(max, i, j)] = n;
+                n += 1; 
             }
         }
         assert_eq!(hungarian(&matrix, max, max), (0..max).rev().collect::<Vec<_>>());

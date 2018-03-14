@@ -20,6 +20,19 @@ fn bench_hungarian(c: &mut Criterion) {
     }, &[5, 10, 25, 50]);
 }
 
-criterion_group!(benches, bench_hungarian);
-criterion_main!(benches);
+fn bench_hungarian_worst_case(c: &mut Criterion) {
+    c.bench_function_over_inputs("hungarian_worst_case_NxN", |b, &&max| {
+        let mut matrix = vec![0; max * max];
+        
+        for i in 0..max {
+            for j in 0..max {
+                matrix[max*i + j] = ((i + 1)*(j + 1)) as u64;
+            }
+        }
 
+        b.iter(move || hungarian(&matrix, max, max))
+    }, &[5, 10, 25, 50]);
+}
+
+criterion_group!(benches, bench_hungarian, bench_hungarian_worst_case);
+criterion_main!(benches);
