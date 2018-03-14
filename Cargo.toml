@@ -4,9 +4,7 @@ version = "0.1.0"
 authors = ["Newton Ni <nwtnni@gmail.com>"]
 
 [dependencies]
-fnv = "1.0.6"
 fixedbitset = "0.1.8"
-itertools = "0.7.7"
 
 [dev-dependencies]
 criterion = "0.2"

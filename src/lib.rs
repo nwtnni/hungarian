@@ -1,17 +1,10 @@
-#[macro_use]
-extern crate itertools;
-extern crate fnv;
 extern crate fixedbitset;
 
-use fnv::FnvHashMap;
 use fixedbitset::FixedBitSet;
 
 macro_rules! index {
     ($w:expr, $i:expr, $j:expr) => (($w*$i) + $j)
 }
-
-#[derive(Debug, Eq, PartialEq)]
-enum Type { Star, Prime }
 
 pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
 
@@ -24,16 +17,16 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         row.iter_mut().for_each(|cost| *cost -= min);
     }
 
-    let mut mask = FnvHashMap::default();
+    let mut stars = FixedBitSet::with_capacity(w * h);
+    let mut primes = FixedBitSet::with_capacity(w * h);
     let mut row_cover = FixedBitSet::with_capacity(h);
     let mut col_cover = FixedBitSet::with_capacity(w);
 
     // Star zeros
     for i in 0..h {
         for j in 0..w {
-            if matrix[index!(w, i, j)] == 0
-            && !(row_cover[i] || col_cover[j]) {
-                mask.insert((i, j), Type::Star);
+            if matrix[index!(w, i, j)] == 0 && !(row_cover[i] || col_cover[j]) {
+                stars.insert(index!(w, i, j));
                 row_cover.insert(i);
                 col_cover.insert(j);
             }
@@ -51,21 +44,14 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         if verify {
             for i in 0..h {
                 for j in 0..w {
-                    if let Some(&Type::Star) = mask.get(&(i, j)) {
+                    if stars[index!(w, i, j)] {
                         col_cover.insert(j);
                     }
                 }
             }
 
             if col_cover.count_ones(..) == target {
-                let mut result = mask.into_iter()
-                    .filter(|&(_, ref t)| t == &Type::Star)
-                    .map(|(key, _)| key)
-                    .collect::<Vec<_>>();
-                result.sort_by_key(|&(i, _)| i);
-                return result.into_iter()
-                    .map(|(_, j)| j)
-                    .collect()
+                return stars.ones().map(|index| index % w).collect()
             }
         }
 
@@ -74,10 +60,10 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         for i in 0..h {
             if uncovered != None { break }
             for j in 0..w {
-                if matrix[index!(w, i, j)] == 0
-                && mask.get(&(i, j)).is_none()
-                && !row_cover[i]
-                && !col_cover[j] {
+                let index = index!(w, i, j);
+                if matrix[index] == 0
+                && !(stars[index] || primes[index]
+                || row_cover[i] || col_cover[j]) {
                     uncovered = Some((i, j));
                     break
                 }
@@ -107,11 +93,11 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         }
 
         let (i, j) = uncovered.unwrap();
-        mask.insert((i, j), Type::Prime);
+        primes.insert(index!(w, i, j));
 
         let starred = (0..w).filter(|&j| {
-            mask.get(&(i, j)) == Some(&Type::Star)
-            && matrix[index!(w, i, j)] == 0
+            let index = index!(w, i, j);
+            stars[index] && matrix[index] == 0
         }).nth(0);
 
         if let Some(adj) = starred {
@@ -126,7 +112,7 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         loop {
             let (_, prev_col) = path[path.len() - 1];
             let next_star = (0..h).filter(|&i| {
-                mask.get(&(i, prev_col)) == Some(&Type::Star)
+                stars[index!(w, i, prev_col)]
             }).nth(0);
 
             if let None = next_star { break }
@@ -134,18 +120,20 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
             path.push((star_row, prev_col));
 
             let prime_col = (0..w).filter(|&col| {
-                mask.get(&(star_row, col)) == Some(&Type::Prime)
+                primes[index!(w, star_row, col)]
             }).nth(0).unwrap();
             path.push((star_row, prime_col));
         }
 
         // Augment path
         for (i, col) in path {
-            match mask.get(&(i, col)) {
-                None => continue,
-                Some(&Type::Star) => mask.remove(&(i, col)),
-                Some(&Type::Prime) => mask.insert((i, col), Type::Star),
-            };
+            let index = index!(w, i, col);
+            if primes[index] {
+                stars.set(index, true);
+                primes.set(index, false);
+            } else {
+                stars.set(index, false);
+            }
         }
 
         // Reset cover
@@ -153,7 +141,7 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         col_cover.clear();
 
         // Erase primes
-        mask.retain(|_, t| t != &mut Type::Prime);
+        primes.clear();
         verify = true;
     }
 }
