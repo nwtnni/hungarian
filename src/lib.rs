@@ -11,24 +11,29 @@ macro_rules! index {
 ///
 /// Implementation of the Hungarian / Munkres Assignment Algorithm.
 ///
-/// Given a cost matrix, this algorithm finds a perfect matching such
+/// Given a rectangular cost matrix, this algorithm finds a maximal matching such
 /// that the total cost is minimized. [Follows the general outline explained here.][1]
 ///
-/// # Requires
+/// # Requires 
 ///
-/// - `matrix` is square (i.e. `w` == `h`). `matrix` can be padded with 0's if
-///     non-square, without changing the solution.
-/// - Should also work if `w` > `h`, but there are currently no test cases for this scenario.
+/// - `matrix` is rectangular (i.e. no ragged matrices)
 ///
 /// # Takes
 ///
 /// - `matrix: &[u64]`: a 1D slice in row-major order, representing a 2D matrix
-/// - `w`: width of `matrix` (i.e. number of columns)
-/// - `h`: height of `matrix` (i.e. number of rows)
+/// - `height`: height of `matrix` (i.e. number of rows)
+/// - `width`: width of `matrix` (i.e. number of columns)
 ///
 /// # Returns
 ///
-/// - `v`: A Vec such that `v[i]` is the column assigned to row `i`.
+/// - `v`: A Vec where `v[i]` is:
+///     - `Some(j)` if row `i` should be assigned to column `j`
+///     - `None` if row `i` is not in the optimal assignment. Only possible if `width < height`.
+///
+/// # Panics
+///
+/// This function uses array indexing directly, and will almost definitely
+/// panic with out-of-bounds if passed incorrect `width` or `height` arguments.
 ///
 /// # Examples
 ///
@@ -39,30 +44,83 @@ macro_rules! index {
 ///
 /// fn main() {
 ///
+///     // Square matrix
+///
 ///     let width = 3;
 ///     let height = 3;
-///
 ///     let matrix = vec![
 ///         1, 2, 1,
 ///         4, 5, 6,
 ///         7, 8, 9,
 ///     ];
+///     
+///     let assignment = minimize(&matrix, height, width);
 ///
-///     let assignment = minimize(&matrix, width, height);
-///
-///     assert_eq!(&assignment, &vec![2, 1, 0]);
+///     assert_eq!(&assignment, &vec![Some(2), Some(1), Some(0)]);
 ///
 ///     let cost: u64 = assignment.iter()
 ///         .enumerate()
-///         .map(|(i, &j)| matrix[i*width + j])
+///         .filter_map(|(i, &a)| {
+///             a.map(|j| matrix[i*width + j])
+///         })
 ///         .sum();
 ///
 ///     assert_eq!(cost, 13);
+///
+///     // Rectangular matrix (height < width)
+///
+///     let height = 2;
+///     let width = 3;
+///     let matrix = vec![
+///         1, 0, 5,
+///         2, 3, 1, 
+///     ];
+///
+///     let assignment = minimize(&matrix, height, width);
+///
+///     assert_eq!(&assignment, &vec![Some(1), Some(2)]);
+///
+///     let cost: u64 = assignment.iter()
+///         .enumerate()
+///         .filter_map(|(i, &a)| {
+///             a.map(|j| matrix[i*width + j])
+///         })
+///         .sum();
+///
+///     assert_eq!(cost, 1);
+///
+///     // Rectangular matrix (width < height)
+///
+///     let height = 3;
+///     let width = 2;
+///     let matrix = vec![
+///         5, 5,
+///         1, 0,
+///         2, 3, 
+///     ];
+///
+///     let assignment = minimize(&matrix, height, width);
+///
+///     assert_eq!(&assignment, &vec![None, Some(1), Some(0)]);
+///
+///     let cost: u64 = assignment.iter()
+///         .enumerate()
+///         .filter_map(|(i, &a)| {
+///             a.map(|j| matrix[i*width + j])
+///         })
+///         .sum();
+///
+///     assert_eq!(cost, 2);
+///
 /// }
+/// ```
 ///
 /// [1]: http://csclab.murraystate.edu/~bob.pilgrim/445/munkres.html
-/// ```
-pub fn minimize(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
+///
+pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize>> {
+
+    // No possible assignment
+    if height == 0 || width == 0 { return Vec::new() }
 
     //********************************************//
     //                                            //
@@ -70,11 +128,23 @@ pub fn minimize(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
     //                                            //
     //********************************************//
 
-    // Number of assignments to find
-    let target = usize::min(w, h);
+    // Rotate matrix if width < height
+    let rotated = width < height;
 
-    // Clone of the provided slice
-    let mut matrix = Vec::from(matrix);
+    let mut matrix = if rotated {
+        let mut result = vec![0; width * height];
+        for i in 0..height {
+            for j in 0..width {
+                result[index!(height, width - 1 - j, i)] = matrix[index!(width, i, j)];
+            } 
+        }
+        result
+    } else {
+        Vec::from(matrix)
+    };
+    
+    // Swap dimensions if rotated
+    let (w, h) = if rotated { (height, width) } else { (width, height) };
 
     // The set of starred zero entries (flattened into 1D)
     let mut stars = FixedBitSet::with_capacity(w * h);
@@ -133,12 +203,20 @@ pub fn minimize(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         //                                            //
         //********************************************//
 
-        // Cover each column with a starred zero.
-        // If there are `target` starred zeros, then we're done.
+        // Cover each column with a starred zero. If all columns are covered, we're done.
         if verify {
             stars.ones().for_each(|k| col_cover.insert(k % w));
-            if col_cover.count_ones(..) == target {
-                return stars.ones().map(|k| k % w).collect()
+            if col_cover.count_ones(..) == h {
+                let assign = stars.ones().map(|k| k % w);
+
+                // Rotate results back
+                if rotated {
+                    let mut result = vec![None; w];
+                    assign.enumerate().for_each(|(i, j)| result[j] = Some(h - i - 1));
+                    return result
+                } else {
+                    return assign.map(|j| Some(j)).collect()
+                }
             }
         }
 
@@ -186,8 +264,9 @@ pub fn minimize(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
             // Subtract minimum from uncovered columns
             for i in 0..h {
                 for j in 0..w {
-                    if row_cover[i] { matrix[index!(w, i, j)] += min }
-                    if !col_cover[j] { matrix[index!(w, i, j)] -= min }
+                    let k = index!(w, i, j);
+                    if  row_cover[i] { matrix[k] += min }
+                    if !col_cover[j] { matrix[k] -= min }
                 }
             }
 
@@ -266,63 +345,120 @@ mod tests {
     use minimize;
 
     #[test]
-    fn test_basic() {
-        let matrix = vec![
-            1, 2, 2,
-            2, 1, 2,
-            2, 2, 1,
-        ];
-        assert_eq!(minimize(&matrix, 3, 3), vec![0, 1, 2])
+    fn test_basic_0x0() {
+        let matrix = Vec::new(); 
+        assert_eq!(
+            minimize(&matrix, 0, 0),
+            Vec::new()
+        )
     }
 
     #[test]
-    fn test_increasing() {
+    fn test_basic_1x1() {
+        let matrix = vec![1];
+        assert_eq!(
+            minimize(&matrix, 1, 1),
+            vec![Some(0)]
+        );
+    }
+
+    #[test]
+    fn test_basic_1x2() {
         let matrix = vec![
-            1,   2,  3,  1,
-            5,   6,  7,  8,
-            9,  10, 11, 12,
-            13, 14, 15, 16,
+            1, 2
         ];
-        assert_eq!(minimize(&matrix, 4, 4), vec![3, 2, 1, 0])
+        assert_eq!(
+            minimize(&matrix, 1, 2),
+            vec![Some(0)]
+        );
+    }
+
+    #[test]
+    fn test_basic_2x1() {
+        let matrix = vec![
+            1,
+            2
+        ];
+        assert_eq!(
+            minimize(&matrix, 2, 1),
+            vec![Some(0), None]
+        );
+    }
+
+    #[test]
+    fn test_basic_2x2() {
+        let matrix = vec![
+            1, 2,
+            2, 1,
+        ];
+        assert_eq!(
+            minimize(&matrix, 2, 2),
+            vec![Some(0), Some(1)]
+        );
     }
 
     // From http://www.math.harvard.edu/archive/20_spring_05/handouts/assignment_overheads.pdf
     #[test]
-    fn test_sales_example() {
+    fn test_sales_3x3() {
         let matrix = vec![
             250, 400, 350,
             400, 600, 350,
             200, 400, 250,
         ];
-        assert_eq!(minimize(&matrix, 3, 3), vec![1, 2, 0]);
+        assert_eq!(
+            minimize(&matrix, 3, 3),
+            vec![Some(1), Some(2), Some(0)]
+        );
     }
 
     // From https://brilliant.org/wiki/hungarian-matching/
     #[test]
-    fn test_party_example() {
+    fn test_party_3x3() {
         let matrix = vec![
             108, 125, 150,
             150, 135, 175,
             122, 148, 250,
         ];
-        assert_eq!(minimize(&matrix, 3, 3), vec![2, 1, 0]);
+        assert_eq!(
+            minimize(&matrix, 3, 3),
+            vec![Some(2), Some(1), Some(0)]
+        );
     }
 
     // From https://en.wikipedia.org/wiki/Hungarian_algorithm#Matrix_interpretation
     #[test]
-    fn test_wiki() {
+    fn test_wikipedia_4x4() {
         let matrix = vec![
             0, 1, 2, 3,
             4, 5, 6, 0,
             0, 2, 4, 5,
             3, 0, 0, 9,
         ];
-        assert_eq!(minimize(&matrix, 4, 4), vec![1, 3, 0, 2]);
+        assert_eq!(
+            minimize(&matrix, 4, 4),
+            vec![Some(1), Some(3), Some(0), Some(2)]
+        );
+    }
+
+    // From https://www.wikihow.com/Use-the-Hungarian-Algorithm
+    #[test]
+    fn test_wikihow_5x5() {
+        let matrix = vec![
+            10, 19, 8, 15, 19,
+            10, 18, 7, 17, 19,
+            13, 16, 9, 14, 19,
+            12, 19, 8, 18, 19,
+            14, 17, 10, 19, 19
+        ];
+        assert_eq!(
+            minimize(&matrix, 5, 5),
+            vec![Some(0), Some(2), Some(3), Some(4), Some(1)]
+        );
     }
 
     // From https://github.com/bmc/munkres/blob/master/test/test_munkres.py
     #[test]
-    fn test_python_5() {
+    fn test_python_5x5() {
         let matrix = vec![
             12,  9, 27, 10, 23,
              7, 13, 13, 30, 19,
@@ -330,16 +466,19 @@ mod tests {
              9, 28, 26, 23, 13,
             16, 16, 24,  6,  9,
         ];
-        assert_eq!(minimize(&matrix, 5, 5)
-            .iter()
-            .enumerate()
-            .map(|(i, &j)| matrix[index!(5, i, j)])
-            .sum::<u64>(), 51);
+        assert_eq!(
+            51,
+            minimize(&matrix, 5, 5)
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &v)| v.map(|j| matrix[index!(5, i, j)]))
+                .sum::<u64>()
+        );
     }
 
     // From https://github.com/bmc/munkres/blob/master/test/test_munkres.py
     #[test]
-    fn test_python_10() {
+    fn test_python_10x10() {
         let matrix = vec![
             37, 34, 29, 26, 19,  8,  9, 23, 19, 29,
              9, 28, 20,  8, 18, 20, 14, 33, 23, 14,
@@ -352,16 +491,19 @@ mod tests {
             21, 25, 23, 39, 31, 37, 32, 33, 38,  1,
             17, 34, 40, 10, 29, 37, 40,  3, 25,  3,
         ];
-        assert_eq!(minimize(&matrix, 10, 10)
-            .iter()
-            .enumerate()
-            .map(|(i, &j)| matrix[index!(10, i, j)])
-            .sum::<u64>(), 66);
+        assert_eq!(
+            66,
+            minimize(&matrix, 10, 10)
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &v)| v.map(|j| matrix[index!(10, i, j)]))
+                .sum::<u64>()
+        );
     }
 
     // From https://github.com/bmc/munkres/blob/master/test/test_munkres.py
     #[test]
-    fn test_python_20() {
+    fn test_python_20x20() {
         let matrix = vec![
             5,  4,  3,  9,  8,  9,  3,  5,  6,  9,  4, 10,  3,  5,  6,  6,  1,  8, 10,  2,
             10, 9,  9,  2,  8,  3,  9,  9, 10,  1,  7, 10,  8,  4,  2,  1,  4,  8,  4,  8,
@@ -384,64 +526,34 @@ mod tests {
             9,  6,  3,  1,  8,  5,  7,  8,  7,  2,  1,  8,  2,  8,  3,  7,  4,  8,  7,  7,
             8,  4,  4,  9,  7, 10,  6,  2,  1,  5,  8,  5,  1,  1,  1,  9,  1,  3,  5,  3,
         ];
-        assert_eq!(minimize(&matrix, 20, 20)
-            .iter()
-            .enumerate()
-            .map(|(i, &j)| matrix[index!(20, i, j)])
-            .sum::<u64>(), 22);
-    }
-
-
-    // From https://stackoverflow.com/questions/17419595/hungarian-kuhn-munkres-algorithm-oddity
-    #[test]
-    fn test_stack_overflow_a() {
-        let matrix = vec![
-            0, 7, 0, 0, 0,
-            0, 8, 0, 0, 6,
-            5, 0, 7, 3, 4,
-            5, 0, 5, 9, 3,
-            0, 4, 0, 0, 9,
-        ];
-        assert_eq!(minimize(&matrix, 5, 5)
-            .iter()
-            .enumerate()
-            .map(|(i, &j)| matrix[index!(5, i, j)])
-            .sum::<u64>(), 3);
-        assert_eq!(minimize(&matrix, 5, 5), vec![4, 2, 3, 1, 0]);
-    }
-
-    // From https://stackoverflow.com/questions/26893961/cannot-solve-hungarian-algorithm
-    #[test]
-    fn test_stack_overflow_b() {
-        let matrix = vec![
-             0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  0,  0,  0,
-            53, 207, 256, 207, 231, 348, 348, 348, 231, 244, 244,  0,  0,  0,
-           240,  33,  67,  33,  56, 133, 133, 133,  56,  33,  33,  0,  0,  0,
-           460, 107, 200, 107, 122, 324, 324, 324, 122,  33,  33,  0,  0,  0,
-           167, 340, 396, 340, 422, 567, 567, 567, 422, 442, 442,  0,  0,  0,
-           167, 367, 307, 367, 433, 336, 336, 336, 433, 158, 158,  0,  0,  0,
-           160,  20,  37,  20,  31,  70,  70,  70,  31,  22,  22,  0,  0,  0,
-           200, 307, 393, 307, 222, 364, 364, 364, 222, 286, 286,  0,  0,  0,
-           33 , 153, 152, 153, 228, 252, 252, 252, 228,  78,  78,  0,  0,  0,
-           93 , 140, 185, 140,  58, 118, 118, 118,  58,  44,  44,  0,  0,  0,
-           0  ,   7,  22,   7,  19,  58,  58,  58,  19,   0,   0,  0,  0,  0,
-           67 , 153, 241, 153, 128, 297, 297, 297, 128,  39,  39,  0,  0,  0,
-           73 , 253, 389, 253, 253, 539, 539, 539, 253,  36,  36,  0,  0,  0,
-           173, 267, 270, 267, 322, 352, 352, 352, 322, 231, 231,  0,  0,  0,
-        ];
         assert_eq!(
-            minimize(&matrix, 14, 14)
+            22,
+            minimize(&matrix, 20, 20)
                 .iter()
                 .enumerate()
-                .map(|(i, &j)| matrix[index!(14, i, j)])
-                .sum::<u64>(),
-            828
+                .filter_map(|(i, &v)| v.map(|j| matrix[index!(20, i, j)]))
+                .sum::<u64>()
+        );
+    }
+
+    // From https://stackoverflow.com/questions/37687045/hungarian-algorithm-dead-end
+    #[test]
+    fn test_stack_overflow_4x4_zeros() {
+        let matrix = vec![
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+            0, 0, 1, 2,
+            0, 0, 3, 4,
+        ];
+        assert_eq!(
+            minimize(&matrix, 4, 4),
+            vec![Some(3), Some(2), Some(1), Some(0)]
         );
     }
 
     // From https://stackoverflow.com/questions/46803600/hungarian-algorithm-wikipedia-method-doesnt-work-for-this-example
     #[test]
-    fn test_stack_overflow_c() {
+    fn test_stack_overflow_4x4() {
         let matrix = vec![
             35,  0,  0,  0,
             0 , 30,  0,  5,
@@ -449,19 +561,46 @@ mod tests {
             0 , 45, 30, 45,
         ];
         assert_eq!(
+            5,
             minimize(&matrix, 4, 4)
                 .iter()
                 .enumerate()
-                .map(|(i, &j)| matrix[index!(4, i, j)])
-                .sum::<u64>(),
-            5
+                .filter_map(|(i, &v)| v.map(|j| matrix[index!(4, i, j)]))
+                .sum::<u64>()
         );
-        assert_eq!(minimize(&matrix, 4, 4), vec![1, 3, 2, 0]);
+        assert_eq!(
+            minimize(&matrix, 4, 4),
+            vec![Some(1), Some(3), Some(2), Some(0)]
+        );
+    }
+
+    // From https://stackoverflow.com/questions/17419595/hungarian-kuhn-munkres-algorithm-oddity
+    #[test]
+    fn test_stack_overflow_5x5() {
+        let matrix = vec![
+            0, 7, 0, 0, 0,
+            0, 8, 0, 0, 6,
+            5, 0, 7, 3, 4,
+            5, 0, 5, 9, 3,
+            0, 4, 0, 0, 9,
+        ];
+        assert_eq!(
+            3,
+            minimize(&matrix, 5, 5)
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &v)| v.map(|j| matrix[index!(5, i, j)]))
+                .sum::<u64>()
+        );
+        assert_eq!(
+            minimize(&matrix, 5, 5), 
+            vec![Some(4), Some(2), Some(3), Some(1), Some(0)]
+        );
     }
 
     // From https://stackoverflow.com/questions/37687045/hungarian-algorithm-dead-end
     #[test]
-    fn test_stack_overflow_d() {
+    fn test_stack_overflow_6x6() {
         let matrix = vec![
             2, 1, 0, 0, 0, 3,
             2, 0, 4, 5, 2, 7,
@@ -470,32 +609,39 @@ mod tests {
             0, 0, 6, 3, 3, 5,
             3, 4, 5, 2, 0, 3,
         ];
-        assert_eq!(minimize(&matrix, 6, 6), vec![3, 1, 2, 5, 0, 4]);
+        assert_eq!(
+            minimize(&matrix, 6, 6),
+            vec![Some(3), Some(1), Some(2), Some(5), Some(0), Some(4)]
+        );
     }
 
-    // From https://stackoverflow.com/questions/37687045/hungarian-algorithm-dead-end
+    // From https://stackoverflow.com/questions/26893961/cannot-solve-hungarian-algorithm
     #[test]
-    fn test_stack_overflow_e() {
+    fn test_stack_overflow_14x11() {
         let matrix = vec![
-            0, 0, 0, 0,
-            0, 0, 0, 0,
-            0, 0, 1, 2,
-            0, 0, 3, 4,
+             0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+            53, 207, 256, 207, 231, 348, 348, 348, 231, 244, 244,
+           240,  33,  67,  33,  56, 133, 133, 133,  56,  33,  33,
+           460, 107, 200, 107, 122, 324, 324, 324, 122,  33,  33,
+           167, 340, 396, 340, 422, 567, 567, 567, 422, 442, 442,
+           167, 367, 307, 367, 433, 336, 336, 336, 433, 158, 158,
+           160,  20,  37,  20,  31,  70,  70,  70,  31,  22,  22,
+           200, 307, 393, 307, 222, 364, 364, 364, 222, 286, 286,
+           33 , 153, 152, 153, 228, 252, 252, 252, 228,  78,  78,
+           93 , 140, 185, 140,  58, 118, 118, 118,  58,  44,  44,
+           0  ,   7,  22,   7,  19,  58,  58,  58,  19,   0,   0,
+           67 , 153, 241, 153, 128, 297, 297, 297, 128,  39,  39,
+           73 , 253, 389, 253, 253, 539, 539, 539, 253,  36,  36,
+           173, 267, 270, 267, 322, 352, 352, 352, 322, 231, 231,
         ];
-        assert_eq!(minimize(&matrix, 4, 4), vec![3, 2, 1, 0]);
-    }
-
-    // From https://www.wikihow.com/Use-the-Hungarian-Algorithm
-    #[test]
-    fn test_wikihow_example() {
-        let matrix = vec![
-            10, 19, 8, 15, 19,
-            10, 18, 7, 17, 19,
-            13, 16, 9, 14, 19,
-            12, 19, 8, 18, 19,
-            14, 17, 10, 19, 19
-        ];
-        assert_eq!(minimize(&matrix, 5, 5), vec![0, 2, 3, 4, 1]);
+        assert_eq!(
+            828,
+            minimize(&matrix, 14, 11)
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &v)| v.map(|j| matrix[index!(11, i, j)]))
+                .sum::<u64>()
+        );
     }
 
     #[test]
@@ -510,7 +656,9 @@ mod tests {
                     n += 1;
                 }
             }
-            assert_eq!(minimize(&matrix, max, max), (0..max).rev().collect::<Vec<_>>());
+
+            let expected = (0..max).map(|i| Some(i)).rev().collect::<Vec<_>>();
+            assert_eq!(minimize(&matrix, max, max), expected);
         }
     }
 
@@ -524,7 +672,9 @@ mod tests {
                     matrix[index!(max, i, j)] = ((i + 1)*(j + 1)) as u64;
                 }
             }
-            assert_eq!(minimize(&matrix, max, max), (0..max).rev().collect::<Vec<_>>());
+
+            let expected = (0..max).map(|i| Some(i)).rev().collect::<Vec<_>>();
+            assert_eq!(minimize(&matrix, max, max), expected);
         }
     }
 
@@ -540,6 +690,8 @@ mod tests {
                 n += 1;
             }
         }
-        assert_eq!(minimize(&matrix, max, max), (0..max).rev().collect::<Vec<_>>());
+
+        let expected = (0..max).map(|i| Some(i)).rev().collect::<Vec<_>>();
+        assert_eq!(minimize(&matrix, max, max), expected);
     }
 }
