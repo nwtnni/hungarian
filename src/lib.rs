@@ -25,9 +25,9 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
     // Star zeros
     for i in 0..h {
         for j in 0..w {
-            let index = index!(w, i, j);
-            if matrix[index] == 0 && !(row_cover[i] || col_cover[j]) {
-                stars.insert(index);
+            let k = index!(w, i, j);
+            if matrix[k] == 0 && !(row_cover[i] || col_cover[j]) {
+                stars.insert(k);
                 row_cover.insert(i);
                 col_cover.insert(j);
             }
@@ -43,23 +43,21 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
 
         // Count cover
         if verify {
-            stars.ones().for_each(|index| col_cover.insert(index % w));
+            stars.ones().for_each(|k| col_cover.insert(k % w));
             if col_cover.count_ones(..) == target {
-                return stars.ones().map(|index| index % w).collect()
+                return stars.ones().map(|k| k % w).collect()
             }
         }
 
         // Find uncovered zero
         let mut uncovered = None;
-        for i in 0..h {
-            if uncovered != None { break }
+
+        'outer : for i in 0..h {
             for j in 0..w {
-                let index = index!(w, i, j);
-                if matrix[index] == 0
-                && !(stars[index] || primes[index]
-                || row_cover[i] || col_cover[j]) {
+                let k = index!(w, i, j);
+                if !(matrix[k] != 0 || stars[k] || primes[k] || row_cover[i] || col_cover[j]) {
                     uncovered = Some((i, j));
-                    break
+                    break 'outer;
                 }
             }
         }
@@ -90,8 +88,8 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         primes.insert(index!(w, i, j));
 
         let starred = (0..w).filter(|&j| {
-            let index = index!(w, i, j);
-            stars[index] && matrix[index] == 0
+            let k = index!(w, i, j);
+            stars[k] && matrix[k] == 0
         }).next();
 
         if let Some(adj) = starred {
@@ -122,12 +120,12 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
 
         // Augment path
         for (i, col) in path {
-            let index = index!(w, i, col);
-            if primes[index] {
-                stars.set(index, true);
-                primes.set(index, false);
+            let k = index!(w, i, col);
+            if primes[k] {
+                stars.set(k, true);
+                primes.set(k, false);
             } else {
-                stars.set(index, false);
+                stars.set(k, false);
             }
         }
 

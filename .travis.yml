@@ -12,5 +12,5 @@ matrix:
 cache: cargo
 
 script:
-  - cargo build --verbose
-  - cargo test --verbose
+  - cargo build --verbose --release
+  - cargo test --verbose --release
