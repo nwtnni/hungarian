@@ -390,7 +390,7 @@ mod tests {
         assert_eq!(hungarian(matrix), vec![0, 2, 3, 4, 1]);
     }
 
-    // #[test]
+    #[test]
     fn test_worst_case() {
         for max in 1..100 {
             let mut matrix = vec![vec![0; max]; max];
