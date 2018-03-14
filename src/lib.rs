@@ -2,16 +2,36 @@ extern crate fixedbitset;
 
 use fixedbitset::FixedBitSet;
 
+/// Internal helper macro for converting from a 2D index to a 1D index.
 macro_rules! index {
     ($w:expr, $i:expr, $j:expr) => (($w*$i) + $j)
 }
 
+/// Implementation of the Hungarian / Munkres Assignment Algorithm.
+///
+/// Given a cost matrix, this algorithm finds a perfect matching such
+/// that the total cost is minimized.  Follows the
+/// [outline explained here](http://csclab.murraystate.edu/~bob.pilgrim/445/munkres.html).
+///
+/// Takes:
+/// - `matrix: &[u64]`: a 1D slice in row-major order, representing a 2D matrix
+/// - `w`: width of `matrix` (i.e. number of columns)
+/// - `h`: height of `matrix` (i.e. number of rows)
+///
+/// Returns:
+/// - `v`: A Vec such that `v[i]` is the column assigned to row `i`.
+///
+/// Requires:
+/// - `matrix` is square (i.e. `w` == `h`). `matrix` can be padded with 0's if
+///     non-square, without changing the solution.
+/// - Should also work if `w` > `h`, but there are currently no test cases for this scenario.
+///
 pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
 
     let target = usize::min(w, h);
     let mut matrix = Vec::from(matrix);
 
-    // Reduce rows
+    // Step 1: reduce rows
     for row in matrix.chunks_mut(w) {
         let min = row.iter().min().unwrap().clone();
         row.iter_mut().for_each(|cost| *cost -= min);
@@ -22,7 +42,7 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
     let mut row_cover = FixedBitSet::with_capacity(h);
     let mut col_cover = FixedBitSet::with_capacity(w);
 
-    // Star and cover uncovered zeros
+    // Step 2: star and cover all zeros with no other starred zeros in row or column
     for i in 0..h {
         for j in 0..w {
             let k = index!(w, i, j);
@@ -41,7 +61,7 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
 
     loop {
 
-        // Count columns covered
+        // Step 3: count columns covered
         if verify {
             stars.ones().for_each(|k| col_cover.insert(k % w));
             if col_cover.count_ones(..) == target {
@@ -49,9 +69,8 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
             }
         }
 
-        // Find uncovered zero
+        // Step 4: find uncovered zero
         let mut uncovered = None;
-
         'outer : for i in 0..h {
             for j in 0..w {
                 let k = index!(w, i, j);
@@ -62,8 +81,11 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
             }
         }
 
+        // Step 6: no uncovered zero in Step 4
         // Add and subtract minimum uncovered value
+        // Return to Step 4
         if let None = uncovered {
+
             let mut min = u64::max_value();
             for i in 0..h {
                 for j in 0..w {
@@ -84,13 +106,16 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
             continue
         }
 
+        // Prime uncovered zero
         let (i, j) = uncovered.unwrap();
         primes.insert(index!(w, i, j));
 
+        // Find starred zero in the same row
         let starred = (0..w).filter(|&j| {
             stars[index!(w, i, j)]
         }).next();
 
+        // No starred zero: repeat Step 4
         if let Some(j) = starred {
             row_cover.insert(i);
             col_cover.set(j, false);
@@ -133,9 +158,9 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
 
         // Reset cover
         row_cover.clear();
-        col_cover.clear();
+        col_cover.clear() ;
 
-        // Erase primes
+        // Erase primes and return to Step 3
         primes.clear();
         verify = true;
     }
