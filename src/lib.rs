@@ -25,8 +25,8 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
     }
 
     let mut mask = FnvHashMap::default();
-    let mut row_cover = vec![false; h];
-    let mut col_cover = vec![false; w];
+    let mut row_cover = FixedBitSet::with_capacity(h);
+    let mut col_cover = FixedBitSet::with_capacity(w);
 
     // Star zeros
     for i in 0..h {
@@ -34,15 +34,15 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
             if matrix[index!(w, i, j)] == 0
             && !(row_cover[i] || col_cover[j]) {
                 mask.insert((i, j), Type::Star);
-                row_cover[i] = true;
-                col_cover[j] = true;
+                row_cover.insert(i);
+                col_cover.insert(j);
             }
         }
     }
 
     // Reset cover
-    row_cover.iter_mut().for_each(|cov| *cov = false);
-    col_cover.iter_mut().for_each(|cov| *cov = false);
+    row_cover.clear();
+    col_cover.clear();
     let mut verify = true;
 
     loop {
@@ -52,12 +52,12 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
             for i in 0..h {
                 for j in 0..w {
                     if let Some(&Type::Star) = mask.get(&(i, j)) {
-                        col_cover[j] = true;
+                        col_cover.insert(j);
                     }
                 }
             }
 
-            if col_cover.iter().filter(|&&cov| cov).count() == target {
+            if col_cover.count_ones(..) == target {
                 let mut result = mask.into_iter()
                     .filter(|&(_, ref t)| t == &Type::Star)
                     .map(|(key, _)| key)
@@ -115,8 +115,8 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         }).nth(0);
 
         if let Some(adj) = starred {
-            row_cover[i] = true;
-            col_cover[adj] = false;
+            row_cover.insert(i);
+            col_cover.set(adj, false);
             verify = false;
             continue
         }
@@ -149,8 +149,8 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         }
 
         // Reset cover
-        row_cover.iter_mut().for_each(|cov| *cov = false);
-        col_cover.iter_mut().for_each(|cov| *cov = false);
+        row_cover.clear();
+        col_cover.clear();
 
         // Erase primes
         mask.retain(|_, t| t != &mut Type::Prime);
