@@ -12,7 +12,7 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
     let mut matrix = Vec::from(matrix);
 
     // Reduce rows
-    for mut row in matrix.chunks_mut(w) {
+    for row in matrix.chunks_mut(w) {
         let min = row.iter().min().unwrap().clone();
         row.iter_mut().for_each(|cost| *cost -= min);
     }
@@ -22,11 +22,11 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
     let mut row_cover = FixedBitSet::with_capacity(h);
     let mut col_cover = FixedBitSet::with_capacity(w);
 
-    // Star zeros
+    // Star and cover uncovered zeros
     for i in 0..h {
         for j in 0..w {
             let k = index!(w, i, j);
-            if matrix[k] == 0 && !(row_cover[i] || col_cover[j]) {
+            if matrix[k] == 0 && !row_cover[i] && !col_cover[j] {
                 stars.insert(k);
                 row_cover.insert(i);
                 col_cover.insert(j);
@@ -41,7 +41,7 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
 
     loop {
 
-        // Count cover
+        // Count columns covered
         if verify {
             stars.ones().for_each(|k| col_cover.insert(k % w));
             if col_cover.count_ones(..) == target {
@@ -88,21 +88,22 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         primes.insert(index!(w, i, j));
 
         let starred = (0..w).filter(|&j| {
-            let k = index!(w, i, j);
-            stars[k] && matrix[k] == 0
+            stars[index!(w, i, j)]
         }).next();
 
-        if let Some(adj) = starred {
+        if let Some(j) = starred {
             row_cover.insert(i);
-            col_cover.set(adj, false);
+            col_cover.set(j, false);
             verify = false;
             continue
         }
 
-        // Alternating path of Stars and Primes
+        // Alternating path of stars and primes
         let mut path = vec![(i, j)];
         loop {
             let (_, j) = path[path.len() - 1];
+
+            // Find starred zero in same column
             let next_star = (0..h).filter(|&i| {
                 stars[index!(w, i, j)]
             }).next();
@@ -111,6 +112,7 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
             let i = next_star.unwrap();
             path.push((i, j));
 
+            // Find primed zero in same row
             let next_prime = (0..w).filter(|&j| {
                 primes[index!(w, i, j)]
             }).next();
@@ -119,8 +121,8 @@ pub fn hungarian(matrix: &[u64], w: usize, h: usize) -> Vec<usize> {
         }
 
         // Augment path
-        for (i, col) in path {
-            let k = index!(w, i, col);
+        for (i, j) in path {
+            let k = index!(w, i, j);
             if primes[k] {
                 stars.set(k, true);
                 primes.set(k, false);
