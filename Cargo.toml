@@ -13,15 +13,10 @@ license = "MIT"
 travis-ci = { repository = "nwtnni/hungarian" }
 maintenance = { status = "passively-maintained" }
 
-[profile.release]
-opt-level = 3
-debug = true
-
 [dependencies]
 fixedbitset = "0.1.8"
 num-traits = "0.2.1"
 ndarray = "0.11.1"
-cpuprofiler = "0.0.3"
 
 [dev-dependencies]
 criterion = "0.2"
@@ -29,7 +24,3 @@ criterion = "0.2"
 [[bench]]
 name = "benchmark"
 harness = false
-
-[[bin]]
-name = "profile"
-path = "src/bin.rs"
