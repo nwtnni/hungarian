@@ -18,8 +18,6 @@ Check out the [documentation!](https://docs.rs/hungarian/)
 
 ## Notes
 
-There's only one dependency ([fixedbitset](https://github.com/bluss/fixedbitset)) and one source file in this crate.
-
 Instead of using splitting logic across files and helper functions, I tried to simplify and
 condense the above explanation into a single, simple function while maintaining correctness.
 After trawling the web for test cases, I'm reasonably confident that my implementation works,

@@ -14,14 +14,15 @@ macro_rules! index {
 /// Given a rectangular cost matrix, this algorithm finds a maximal matching such
 /// that the total cost is minimized. [Follows the general outline explained here.][1]
 /// This implementation only works on integer costs (since checking if a float is 0 is
-/// not a great idea). The function will automatically clamp all costs in the
+/// not a great idea).
+///
+/// The function will automatically clamp all costs in the
 /// provided matrix to be greater or equal to zero, and as a result, won't correctly
 /// calculate the minimum assignment for a matrix with negative entries.
 ///
 /// # Requires 
 ///
 /// - `matrix` is rectangular (i.e. no ragged matrices)
-/// - `matrix` contains non-negative costs (enforced by clamping inside function)
 ///
 /// # Takes
 ///
