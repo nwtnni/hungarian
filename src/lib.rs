@@ -203,13 +203,14 @@ pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize
         //                                            //
         //********************************************//
 
-        // Cover each column with a starred zero. If all columns are covered, we're done.
+        // Cover each column with a starred zero.
+        // If the number of starred zeros equals the number of rows, we're done.
         if verify {
             stars.ones().for_each(|k| col_cover.insert(k % w));
             if col_cover.count_ones(..) == h {
                 let assign = stars.ones().map(|k| k % w);
 
-                // Rotate results back
+                // Rotate results back if necessary
                 if rotated {
                     let mut result = vec![None; w];
                     assign.enumerate().for_each(|(i, j)| result[j] = Some(h - i - 1));
@@ -270,9 +271,9 @@ pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize
                 }
             }
 
-            // Return to Step 4
+            // Return to [Step 4]
             // - Skip rest of this loop
-            // - Set `verify` to false to skip Step 3
+            // - Set `verify` to false to skip [Step 3]
             verify = false;
             continue
         }
@@ -284,9 +285,9 @@ pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize
         }).next();
 
         // Starred zero exists:
-        // - Cover row of uncovered zero from Step 4
+        // - Cover row of uncovered zero from [Step 4]
         // - Uncover column of starred zero
-        // - Repeat Step 4
+        // - Repeat [Step 4]
         if let Some(j) = starred {
             row_cover.insert(i);
             col_cover.set(j, false);
@@ -334,7 +335,7 @@ pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize
         row_cover.clear();
         col_cover.clear();
 
-        // Erase primes and return to Step 3
+        // Erase primes and return to [Step 3]
         primes.clear();
         verify = true;
     }
@@ -644,6 +645,96 @@ mod tests {
         );
     }
 
+    // From https://github.com/bmc/munkres/blob/master/munkres.py
+    #[test]
+    fn test_rectangle_3x4() {
+        let matrix = vec![
+            400, 150, 400, 1,
+            400, 450, 600, 2,
+            300, 225, 300, 3,
+        ];
+        assert_eq!(
+            452,
+            minimize(&matrix, 3, 4)
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &v)| v.map(|j| matrix[index!(4, i, j)]))
+                .sum::<u64>()
+        );
+        assert_eq!(
+            minimize(&matrix, 3, 4),
+            vec![Some(1), Some(3), Some(0)]
+        );
+    }
+
+    // Modified from http://www.hungarianalgorithm.com/examplehungarianalgorithm.php
+    #[test]
+    fn test_rectangle_4x5() {
+        let matrix = vec![
+            82, 83, 69, 92, 100,
+            77, 37, 49, 92, 195,
+            11, 69,  5, 86,  93,
+             8,  9, 98, 23, 106,
+        ];
+        assert_eq!(
+            140,
+            minimize(&matrix, 4, 5)
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &v)| v.map(|j| matrix[index!(5, i, j)]))
+                .sum::<u64>()
+        );
+        assert_eq!(
+            minimize(&matrix, 4, 5),
+            vec![Some(2), Some(1), Some(0), Some(3)]
+        );
+    }
+
+    // From https://github.com/bmc/munkres/blob/master/test/test_munkres.py
+    #[test]
+    fn test_rectangle_5x4() {
+        let matrix = vec![
+            34, 26, 17, 12,
+            43, 43, 36, 10,
+            97, 47, 66, 34,
+            52, 42, 19, 36,
+            15, 93, 55, 80
+        ];
+        assert_eq!(
+            70,
+            minimize(&matrix, 5, 4)
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &v)| v.map(|j| matrix[index!(4, i, j)]))
+                .sum::<u64>()
+        );
+        assert_eq!(
+            minimize(&matrix, 5, 4),
+            vec![Some(1), Some(3), None, Some(2), Some(0)]
+        );
+    }
+
+    #[test]
+    fn test_rectangle_nx1() {
+        let max = 100;
+        for n in 1..max {
+            let matrix = (0..n as u64).rev().collect::<Vec<_>>();
+            let mut expected = vec![None; n];
+            expected[n - 1] = Some(0);
+            assert_eq!(minimize(&matrix, n, 1), expected);
+        }
+    }
+    
+    #[test]
+    fn test_rectangle_1xn() {
+        let max = 100;
+        for n in 1..max {
+            let matrix = (0..n as u64).rev().collect::<Vec<_>>();
+            let expected = vec![Some(n - 1)];
+            assert_eq!(minimize(&matrix, 1, n), expected);
+        }
+    }
+
     #[test]
     fn test_stress() {
         for max in 1..100 {
@@ -680,7 +771,7 @@ mod tests {
 
     #[test]
     fn test_large() {
-        let max = 250;
+        let max = 500;
         let mut matrix = vec![0; max * max];
         let mut n: u64 = 0;
 
