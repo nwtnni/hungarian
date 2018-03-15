@@ -9,6 +9,18 @@ macro_rules! index {
     ($w:expr, $i:expr, $j:expr) => (($w*$i) + $j)
 }
 
+/// Internal helper macro for querying a FixedBitSet.
+/// Syntactic sugar for `s[i]`, but without the runtime overhead of the Index trait.
+macro_rules! on {
+    ($s:expr, $i:expr) => ($s.contains($i))
+}
+
+/// Internal helper macro for querying a FixedBitSet.
+/// Syntactic sugar for `!s[i]`, but without the runtime overhead of the Index trait.
+macro_rules! off {
+    ($s:expr, $i:expr) => (!$s.contains($i))
+}
+
 /// Implementation of the Hungarian / Munkres Assignment Algorithm.
 ///
 /// Given a rectangular cost matrix, this algorithm finds a maximal matching such
@@ -192,7 +204,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
     for i in 0..h {
         for j in 0..w {
             let k = index!(w, i, j);
-            if m[k].is_zero() && !row_cover[i] && !col_cover[j] {
+            if m[k].is_zero() && off!(row_cover, i) && off!(col_cover, j) {
                 stars.insert(k);
                 row_cover.insert(i);
                 col_cover.insert(j);
@@ -242,7 +254,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
 
         'outer : for i in 0..h {
             for j in 0..w {
-                if row_cover[i] || col_cover[j] { continue }
+                if on!(row_cover, i) || on!(col_cover, j) { continue }
                 let k = index!(w, i, j);
                 if m[k].is_zero() {
                     uncovered = Some((i, j));
@@ -265,7 +277,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
             let mut min = N::max_value();
             for i in 0..h {
                 for j in 0..w {
-                    if row_cover[i] || col_cover[j] { continue }
+                    if on!(row_cover, i) || on!(col_cover, j) { continue }
                     let value = m[index!(w, i, j)];
                     min = if value < min { value } else { min };
                 }
@@ -276,8 +288,8 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
             for i in 0..h {
                 for j in 0..w {
                     let k = index!(w, i, j);
-                    if  row_cover[i] { m[k] += min }
-                    if !col_cover[j] { m[k] -= min }
+                    if  on!(row_cover, i) { m[k] += min }
+                    if off!(col_cover, j) { m[k] -= min }
                 }
             }
 
@@ -291,7 +303,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         // Find starred zero in the same row
         let (i, j) = uncovered.unwrap();
         let starred = (0..w).filter(|&j| {
-            stars[index!(w, i, j)]
+            on!(stars, index!(w, i, j))
         }).next();
 
         // Starred zero exists:
@@ -318,7 +330,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
 
             // Find starred zero in same column
             let next_star = (0..h).filter(|&i| {
-                stars[index!(w, i, j)]
+                on!(stars, index!(w, i, j))
             }).next();
 
             if let None = next_star { break }
@@ -327,7 +339,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
 
             // Find primed zero in same row
             let next_prime = (0..w).filter(|&j| {
-                primes[index!(w, i, j)]
+                on!(primes, index!(w, i, j))
             }).next();
 
             let j = next_prime.expect("Guaranteed to exist");
@@ -338,7 +350,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         // Star each primed zero
         for (i, j) in path {
             let k = index!(w, i, j);
-            stars.set(k, primes[k]);
+            stars.set(k, on!(primes, k));
         }
 
         // Reset cover
