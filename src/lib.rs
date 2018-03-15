@@ -266,14 +266,18 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         // Find an uncovered zero and prime it
         let mut uncovered = None;
 
-        'outer : for i in 0..h {
-            for j in 0..w {
-                if on!(row_cover, i) || on!(col_cover, j) { continue }
-                let k = index!(w, i, j);
-                if get!(m, k).is_zero() {
-                    uncovered = Some((i, j));
-                    primes.insert(k);
-                    break 'outer;
+        {
+            let mut rows = (0..h).filter(|&i| off!(row_cover, i));
+            let mut cols = (0..w).filter(|&j| off!(col_cover, j));
+
+            'outer : for i in rows.by_ref() {
+                for j in cols.by_ref() {
+                    let k = index!(w, i, j);
+                    if get!(m, k).is_zero() {
+                        uncovered = Some((i, j));
+                        primes.insert(k);
+                        break 'outer;
+                    }
                 }
             }
         }
