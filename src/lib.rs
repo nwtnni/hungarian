@@ -1,22 +1,27 @@
 extern crate fixedbitset;
+extern crate num_traits;
 
 use fixedbitset::FixedBitSet;
+use num_traits::{PrimInt, NumAssign};
 
 /// Internal helper macro for converting from a 2D index to a 1D index.
 macro_rules! index {
     ($w:expr, $i:expr, $j:expr) => (($w*$i) + $j)
 }
 
-/// # Summary
-///
 /// Implementation of the Hungarian / Munkres Assignment Algorithm.
 ///
 /// Given a rectangular cost matrix, this algorithm finds a maximal matching such
 /// that the total cost is minimized. [Follows the general outline explained here.][1]
+/// This implementation only works on integer costs (since checking if a float is 0 is
+/// not a great idea). The function will automatically clamp all costs in the
+/// provided matrix to be greater or equal to zero, and as a result, won't correctly
+/// calculate the minimum assignment for a matrix with negative entries.
 ///
 /// # Requires 
 ///
 /// - `matrix` is rectangular (i.e. no ragged matrices)
+/// - `matrix` contains non-negative costs (enforced by clamping inside function)
 ///
 /// # Takes
 ///
@@ -117,7 +122,7 @@ macro_rules! index {
 ///
 /// [1]: http://csclab.murraystate.edu/~bob.pilgrim/445/munkres.html
 ///
-pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize>> {
+pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usize) -> Vec<Option<usize>> {
 
     // No possible assignment
     if height == 0 || width == 0 { return Vec::new() }
@@ -130,17 +135,21 @@ pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize
 
     // Rotate matrix if width < height
     let rotated = width < height;
+    let mut m = vec![N::zero(); width * height];
 
-    let mut matrix = if rotated {
-        let mut result = vec![0; width * height];
+    // Clamp matrix to
+    if rotated {
         for i in 0..height {
             for j in 0..width {
-                result[index!(height, width - 1 - j, i)] = matrix[index!(width, i, j)];
+                let cost = matrix[index!(width, i, j)];
+                if cost > N::zero() { m[index!(height, width - 1 - j, i)] = cost }
             } 
         }
-        result
     } else {
-        Vec::from(matrix)
+        for k in 0..(height * width) {
+            let cost = matrix[k];
+            if cost > N::zero() { m[k] = cost };
+        }
     };
     
     // Swap dimensions if rotated
@@ -165,7 +174,7 @@ pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize
     //********************************************//
 
     // Reduce each row by its smallest element
-    for row in matrix.chunks_mut(w) {
+    for row in m.chunks_mut(w) {
         let min = row.iter().min().unwrap().clone();
         row.iter_mut().for_each(|cost| *cost -= min);
     }
@@ -182,7 +191,7 @@ pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize
     for i in 0..h {
         for j in 0..w {
             let k = index!(w, i, j);
-            if matrix[k] == 0 && !row_cover[i] && !col_cover[j] {
+            if m[k].is_zero() && !row_cover[i] && !col_cover[j] {
                 stars.insert(k);
                 row_cover.insert(i);
                 col_cover.insert(j);
@@ -234,7 +243,7 @@ pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize
             for j in 0..w {
                 if row_cover[i] || col_cover[j] { continue }
                 let k = index!(w, i, j);
-                if matrix[k] == 0 {
+                if m[k].is_zero() {
                     uncovered = Some((i, j));
                     primes.insert(k);
                     break 'outer;
@@ -252,11 +261,11 @@ pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize
             //********************************************//
 
             // Find minimum uncovered value
-            let mut min = u64::max_value();
+            let mut min = N::max_value();
             for i in 0..h {
                 for j in 0..w {
                     if row_cover[i] || col_cover[j] { continue }
-                    let value = matrix[index!(w, i, j)];
+                    let value = m[index!(w, i, j)];
                     min = if value < min { value } else { min };
                 }
             }
@@ -266,8 +275,8 @@ pub fn minimize(matrix: &[u64], height: usize, width: usize) -> Vec<Option<usize
             for i in 0..h {
                 for j in 0..w {
                     let k = index!(w, i, j);
-                    if  row_cover[i] { matrix[k] += min }
-                    if !col_cover[j] { matrix[k] -= min }
+                    if  row_cover[i] { m[k] += min }
+                    if !col_cover[j] { m[k] -= min }
                 }
             }
 
@@ -347,7 +356,7 @@ mod tests {
 
     #[test]
     fn test_basic_0x0() {
-        let matrix = Vec::new(); 
+        let matrix: Vec<i32> = Vec::new(); 
         assert_eq!(
             minimize(&matrix, 0, 0),
             Vec::new()
