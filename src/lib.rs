@@ -1,8 +1,10 @@
 extern crate fixedbitset;
 extern crate num_traits;
+extern crate ndarray;
 
 use fixedbitset::FixedBitSet;
 use num_traits::{PrimInt, NumAssign};
+use ndarray::prelude::{Array2};
 
 /// Internal macro for converting from a 2D index to a 1D index.
 macro_rules! index {
@@ -11,12 +13,12 @@ macro_rules! index {
 
 /// Internal macro for indexing a Vec without the bounds check
 macro_rules! get {
-    ($m:expr, $i:expr) => (unsafe { *$m.get_unchecked($i) })
+    ($m:expr, $i:expr, $j:expr) => (unsafe { *$m.uget(($i, $j)) })
 }
 
 /// Internal macro for mutating a Vec without the bounds check
 macro_rules! set {
-    ($m:expr, $i:expr, $v: expr) => (unsafe { *$m.get_unchecked_mut($i) = $v; })
+    ($m:expr, $i:expr, $j:expr, $v: expr) => (unsafe { *$m.uget_mut(($i, $j)) = $v; })
 }
 
 /// Internal macro for querying a FixedBitSet.
@@ -42,7 +44,7 @@ macro_rules! off {
 /// provided matrix to be greater or equal to zero, and as a result, won't correctly
 /// calculate the minimum assignment for a matrix with negative entries.
 ///
-/// # Requires 
+/// # Requires
 ///
 /// - `matrix` is rectangular (i.e. no ragged matrices)
 ///
@@ -85,7 +87,7 @@ macro_rules! off {
 ///         4, 5, 6,
 ///         7, 8, 9,
 ///     ];
-///     
+///
 ///     let assignment = minimize(&matrix, height, width);
 ///
 ///     assert_eq!(&assignment, &vec![Some(2), Some(1), Some(0)]);
@@ -105,7 +107,7 @@ macro_rules! off {
 ///     let width = 3;
 ///     let matrix = vec![
 ///         1, 0, 5,
-///         2, 3, 1, 
+///         2, 3, 1,
 ///     ];
 ///
 ///     let assignment = minimize(&matrix, height, width);
@@ -128,7 +130,7 @@ macro_rules! off {
 ///     let matrix = vec![
 ///         5, 5,
 ///         1, 0,
-///         2, 3, 
+///         2, 3,
 ///     ];
 ///
 ///     let assignment = minimize(&matrix, height, width);
@@ -162,25 +164,22 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
 
     // Rotate matrix if width < height
     let rotated = width < height;
-    let mut m = vec![N::zero(); width * height];
-
-    // Clamp matrix to
-    if rotated {
-        for i in 0..height {
-            for j in 0..width {
-                let cost = matrix[index!(width, i, j)];
-                if cost > N::zero() { set!(m, index!(height, width - 1 - j, i), cost) }
-            } 
-        }
-    } else {
-        for k in 0..(height * width) {
-            let cost = matrix[k];
-            if cost > N::zero() { set!(m, k, cost) };
-        }
-    };
-    
-    // Swap dimensions if rotated
     let (w, h) = if rotated { (height, width) } else { (width, height) };
+    let mut m = Array2::zeros((h, w));
+
+    // Clamp matrix to be positive
+    for i in 0..height {
+        for j in 0..width {
+            let cost = matrix[index!(width, i, j)];
+            if cost < N::zero() {
+                continue
+            } else if rotated {
+                set!(m, width - 1 - j, i, cost)
+            } else {
+                set!(m, i, j, cost)
+            }
+        }
+    }
 
     // The set of starred zero entries (flattened into 1D)
     let mut stars = FixedBitSet::with_capacity(w * h);
@@ -201,9 +200,9 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
     //********************************************//
 
     // Reduce each row by its smallest element
-    for row in m.chunks_mut(w) {
+    for mut row in m.genrows_mut() {
         let min = row.iter().min().unwrap().clone();
-        row.iter_mut().for_each(|cost| *cost -= min);
+        row.mapv_inplace(|v| v - min);
     }
 
     //********************************************//
@@ -218,9 +217,8 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
     for i in 0..h {
         for j in 0..w {
             if on!(col_cover, j) { continue }
-            let k = index!(w, i, j);
-            if get!(m, k).is_zero() {
-                stars.insert(k);
+            if get!(m, i, j).is_zero() {
+                stars.insert(index!(w, i, j));
                 col_cover.insert(j);
                 break
             }
@@ -270,10 +268,9 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
             if on!(row_cover, i) { continue }
             for j in 0..w {
                 if on!(col_cover, j) { continue }
-                let k = index!(w, i, j);
-                if get!(m, k).is_zero() {
+                if get!(m, i, j).is_zero() {
                     uncovered = Some((i, j));
-                    primes.insert(k);
+                    primes.insert(index!(w, i, j));
                     break 'outer;
                 }
             }
@@ -294,25 +291,19 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
                 if on!(row_cover, i) { continue }
                 for j in 0..w {
                     if on!(col_cover, j) { continue }
-                    let value = get!(m, index!(w, i, j));
+                    let value = get!(m, i, j);
                     min = if value < min { value } else { min };
                 }
             }
 
             // Add minimum to covered rows
             for i in (0..h).filter(|&i| on!(row_cover, i)) {
-                for j in 0..w {
-                    let k = index!(w, i, j);
-                    set!(m, k, *m.get_unchecked(k) + min);
-                }
+                m.row_mut(i).mapv_inplace(|c| c + min)
             }
 
             // Subtract minimum from uncovered columns
             for j in (0..w).filter(|&j| off!(col_cover, j)) {
-                for i in 0..h {
-                    let k = index!(w, i, j);
-                    set!(m, k, *m.get_unchecked(k) - min);
-                }
+                m.column_mut(j).mapv_inplace(|c| c - min)
             }
 
             // Return to [Step 4]
@@ -385,7 +376,7 @@ mod tests {
 
     #[test]
     fn test_basic_0x0() {
-        let matrix: Vec<i32> = Vec::new(); 
+        let matrix: Vec<i32> = Vec::new();
         assert_eq!(
             minimize(&matrix, 0, 0),
             Vec::new()
@@ -632,7 +623,7 @@ mod tests {
                 .sum::<u64>()
         );
         assert_eq!(
-            minimize(&matrix, 5, 5), 
+            minimize(&matrix, 5, 5),
             vec![Some(4), Some(2), Some(3), Some(1), Some(0)]
         );
     }
@@ -762,7 +753,7 @@ mod tests {
             assert_eq!(minimize(&matrix, n, 1), expected);
         }
     }
-    
+
     #[test]
     fn test_rectangle_1xn() {
         let max = 100;
