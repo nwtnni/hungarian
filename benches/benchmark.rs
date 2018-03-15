@@ -17,7 +17,7 @@ fn bench_hungarian(c: &mut Criterion) {
             }
         }
         b.iter(move || minimize(&matrix, max, max))
-    }, &[5, 10, 25, 50]);
+    }, &[5, 10, 25, 50, 100]);
 }
 
 fn bench_hungarian_worst_case(c: &mut Criterion) {

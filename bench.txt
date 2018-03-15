@@ -1,0 +1,110 @@
+
+running 25 tests
+test tests::test_basic_0x0 ... ignored
+test tests::test_basic_1x1 ... ignored
+test tests::test_basic_1x2 ... ignored
+test tests::test_basic_2x1 ... ignored
+test tests::test_basic_2x2 ... ignored
+test tests::test_large ... ignored
+test tests::test_party_3x3 ... ignored
+test tests::test_python_10x10 ... ignored
+test tests::test_python_20x20 ... ignored
+test tests::test_python_5x5 ... ignored
+test tests::test_rectangle_1xn ... ignored
+test tests::test_rectangle_3x4 ... ignored
+test tests::test_rectangle_4x5 ... ignored
+test tests::test_rectangle_5x4 ... ignored
+test tests::test_rectangle_nx1 ... ignored
+test tests::test_sales_3x3 ... ignored
+test tests::test_stack_overflow_14x11 ... ignored
+test tests::test_stack_overflow_4x4 ... ignored
+test tests::test_stack_overflow_4x4_zeros ... ignored
+test tests::test_stack_overflow_5x5 ... ignored
+test tests::test_stack_overflow_6x6 ... ignored
+test tests::test_stress ... ignored
+test tests::test_wikihow_5x5 ... ignored
+test tests::test_wikipedia_4x4 ... ignored
+test tests::test_worst_case ... ignored
+
+test result: ok. 0 passed; 0 failed; 25 ignored; 0 measured; 0 filtered out
+
+Benchmarking hungarian_NxN/5
+Benchmarking hungarian_NxN/5: Warming up for 3.0000 s
+Benchmarking hungarian_NxN/5: Collecting 100 samples in estimated 5.0066 s (2.1M iterations)
+Benchmarking hungarian_NxN/5: Analyzing
+hungarian_NxN/5         time:   [2.3222 us 2.3523 us 2.3857 us]
+                        change: [+3.3313% +4.9007% +6.5581%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+Benchmarking hungarian_NxN/10
+Benchmarking hungarian_NxN/10: Warming up for 3.0000 s
+Benchmarking hungarian_NxN/10: Collecting 100 samples in estimated 5.0227 s (379k iterations)
+Benchmarking hungarian_NxN/10: Analyzing
+hungarian_NxN/10        time:   [12.790 us 12.963 us 13.133 us]
+                        change: [+5.5723% +7.7105% +9.9814%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 14 outliers among 100 measurements (14.00%)
+  12 (12.00%) high mild
+  2 (2.00%) high severe
+Benchmarking hungarian_NxN/25
+Benchmarking hungarian_NxN/25: Warming up for 3.0000 s
+Benchmarking hungarian_NxN/25: Collecting 100 samples in estimated 5.7825 s (30k iterations)
+Benchmarking hungarian_NxN/25: Analyzing
+hungarian_NxN/25        time:   [186.03 us 188.32 us 190.67 us]
+                        change: [+1.1777% +2.7059% +4.2528%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking hungarian_NxN/50
+Benchmarking hungarian_NxN/50: Warming up for 3.0000 s
+Benchmarking hungarian_NxN/50: Collecting 100 samples in estimated 9.4370 s (5050 iterations)
+Benchmarking hungarian_NxN/50: Analyzing
+hungarian_NxN/50        time:   [1.8390 ms 1.8572 ms 1.8770 ms]
+                        change: [+0.2844% +1.4170% +2.6175%] (p = 0.02 < 0.05)
+                        Change within noise threshold.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+Benchmarking hungarian_worst_case_NxN/5
+Benchmarking hungarian_worst_case_NxN/5: Warming up for 3.0000 s
+Benchmarking hungarian_worst_case_NxN/5: Collecting 100 samples in estimated 5.0014 s (1.6M iterations)
+Benchmarking hungarian_worst_case_NxN/5: Analyzing
+hungarian_worst_case_NxN/5
+                        time:   [3.1278 us 3.1576 us 3.1882 us]
+                        change: [-3.5414% -1.9906% -0.4511%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking hungarian_worst_case_NxN/10
+Benchmarking hungarian_worst_case_NxN/10: Warming up for 3.0000 s
+Benchmarking hungarian_worst_case_NxN/10: Collecting 100 samples in estimated 5.0460 s (141k iterations)
+Benchmarking hungarian_worst_case_NxN/10: Analyzing
+hungarian_worst_case_NxN/10
+                        time:   [36.402 us 36.852 us 37.330 us]
+                        change: [+1.5762% +3.0050% +4.5527%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking hungarian_worst_case_NxN/25
+Benchmarking hungarian_worst_case_NxN/25: Warming up for 3.0000 s
+Benchmarking hungarian_worst_case_NxN/25: Collecting 100 samples in estimated 5.8979 s (5050 iterations)
+Benchmarking hungarian_worst_case_NxN/25: Analyzing
+hungarian_worst_case_NxN/25
+                        time:   [1.1878 ms 1.1994 ms 1.2118 ms]
+                        change: [-2.3001% -1.0102% +0.3664%] (p = 0.15 > 0.05)
+                        No change in performance detected.
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking hungarian_worst_case_NxN/50
+Benchmarking hungarian_worst_case_NxN/50: Warming up for 3.0000 s
+Benchmarking hungarian_worst_case_NxN/50: Collecting 100 samples in estimated 92.231 s (5050 iterations)
+Benchmarking hungarian_worst_case_NxN/50: Analyzing
+hungarian_worst_case_NxN/50
+                        time:   [19.432 ms 19.617 ms 19.818 ms]
+                        change: [+4.7219% +5.8288% +6.9317%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+
