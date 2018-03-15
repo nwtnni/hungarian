@@ -324,9 +324,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
 
         // Find starred zero in the same row
         let (i, j) = uncovered.unwrap();
-        let starred = (0..w).filter(|&j| {
-            on!(stars, index!(w, i, j))
-        }).next();
+        let starred = (0..w).find(|&j| on!(stars, index!(w, i, j)));
 
         // Starred zero exists:
         // - Cover row of uncovered zero from [Step 4]
@@ -351,18 +349,14 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
             let (_, j) = path[path.len() - 1];
 
             // Find starred zero in same column
-            let next_star = (0..h).filter(|&i| {
-                on!(stars, index!(w, i, j))
-            }).next();
+            let next_star = (0..h).find(|&i| on!(stars, index!(w, i, j)));
 
             if let None = next_star { break }
             let i = next_star.unwrap();
             path.push((i, j));
 
             // Find primed zero in same row
-            let next_prime = (0..w).filter(|&j| {
-                on!(primes, index!(w, i, j))
-            }).next();
+            let next_prime = (0..w).find(|&j| on!(primes, index!(w, i, j)));
 
             let j = next_prime.expect("Guaranteed to exist");
             path.push((i, j));
