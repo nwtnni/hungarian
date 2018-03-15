@@ -4,18 +4,28 @@ extern crate num_traits;
 use fixedbitset::FixedBitSet;
 use num_traits::{PrimInt, NumAssign};
 
-/// Internal helper macro for converting from a 2D index to a 1D index.
+/// Internal macro for converting from a 2D index to a 1D index.
 macro_rules! index {
     ($w:expr, $i:expr, $j:expr) => (($w*$i) + $j)
 }
 
-/// Internal helper macro for querying a FixedBitSet.
+/// Internal macro for indexing a Vec without the bounds check
+macro_rules! get {
+    ($m:expr, $i:expr) => (unsafe { *$m.get_unchecked($i) })
+}
+
+/// Internal macro for mutating a Vec without the bounds check
+macro_rules! set {
+    ($m:expr, $i:expr, $v: expr) => (unsafe { *$m.get_unchecked_mut($i) = $v; })
+}
+
+/// Internal macro for querying a FixedBitSet.
 /// Syntactic sugar for `s[i]`, but without the runtime overhead of the Index trait.
 macro_rules! on {
     ($s:expr, $i:expr) => ($s.contains($i))
 }
 
-/// Internal helper macro for querying a FixedBitSet.
+/// Internal macro for querying a FixedBitSet.
 /// Syntactic sugar for `!s[i]`, but without the runtime overhead of the Index trait.
 macro_rules! off {
     ($s:expr, $i:expr) => (!$s.contains($i))
@@ -50,8 +60,12 @@ macro_rules! off {
 ///
 /// # Panics
 ///
-/// This function uses array indexing directly, and will almost definitely
-/// panic with out-of-bounds if passed incorrect `width` or `height` arguments.
+/// This function uses unsafe array indexing directly in order to minimize,
+/// runtime costs, and will eventually panic with out-of-bounds if passed
+/// incorrect `width` or `height` arguments.
+///
+/// If given correct arguments, there is no way we can index out of bounds,
+/// even in unsafe blocks: we only ever iterate between 0 and width/height.
 ///
 /// # Examples
 ///
@@ -155,13 +169,13 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         for i in 0..height {
             for j in 0..width {
                 let cost = matrix[index!(width, i, j)];
-                if cost > N::zero() { m[index!(height, width - 1 - j, i)] = cost }
+                if cost > N::zero() { set!(m, index!(height, width - 1 - j, i), cost) }
             } 
         }
     } else {
         for k in 0..(height * width) {
             let cost = matrix[k];
-            if cost > N::zero() { m[k] = cost };
+            if cost > N::zero() { set!(m, k, cost) };
         }
     };
     
@@ -204,7 +218,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
     for i in 0..h {
         for j in 0..w {
             let k = index!(w, i, j);
-            if m[k].is_zero() && off!(row_cover, i) && off!(col_cover, j) {
+            if get!(m, k).is_zero() && off!(row_cover, i) && off!(col_cover, j) {
                 stars.insert(k);
                 row_cover.insert(i);
                 col_cover.insert(j);
@@ -256,7 +270,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
             for j in 0..w {
                 if on!(row_cover, i) || on!(col_cover, j) { continue }
                 let k = index!(w, i, j);
-                if m[k].is_zero() {
+                if get!(m, k).is_zero() {
                     uncovered = Some((i, j));
                     primes.insert(k);
                     break 'outer;
@@ -278,7 +292,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
             for i in 0..h {
                 for j in 0..w {
                     if on!(row_cover, i) || on!(col_cover, j) { continue }
-                    let value = m[index!(w, i, j)];
+                    let value = get!(m, index!(w, i, j));
                     min = if value < min { value } else { min };
                 }
             }
@@ -286,10 +300,20 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
             // Add minimum to covered rows
             // Subtract minimum from uncovered columns
             for i in 0..h {
-                for j in 0..w {
-                    let k = index!(w, i, j);
-                    if  on!(row_cover, i) { m[k] += min }
-                    if off!(col_cover, j) { m[k] -= min }
+                if on!(row_cover, i) {
+                    for j in 0..w {
+                        let k = index!(w, i, j);
+                        set!(m, k, *m.get_unchecked(k) + min);
+                    }
+                }
+            }
+
+            for j in 0..w {
+                if off!(col_cover, j) {
+                    for i in 0..h {
+                        let k = index!(w, i, j);
+                        set!(m, k, *m.get_unchecked(k) - min);
+                    }
                 }
             }
 
