@@ -1,6 +1,6 @@
 [package]
 name = "hungarian"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Newton Ni <nwtnni@gmail.com>"]
 description = "A simple, fast implementation of the Hungarian (Kuhn-Munkres) algorithm."
 repository = "https://github.com/nwtnni/hungarian"
