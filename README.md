@@ -1,10 +1,10 @@
 # hungarian
 
 [![Build Status](https://travis-ci.org/nwtnni/hungarian.svg?branch=master)](https://travis-ci.org/nwtnni/hungarian)
-[![Crates.io](https://img.shields.io/crates/v/rustc-serialize.svg)](https://crates.io/crates/hungarian)
+[![License](https://img.shields.io/github/license/nwtnni/hungarian.svg)](https://raw.githubusercontent.com/nwtnni/hungarian/master/LICENSE)
+[![Crates.io](https://img.shields.io/crates/v/hungarian.svg)](https://crates.io/crates/hungarian)
 [![Rustdoc](https://docs.rs/hungarian/badge.svg)](https://docs.rs/hungarian/)
-[![License](https://img.shields.io/github/license/mashape/apistatus.svg)](https://raw.githubusercontent.com/nwtnni/hungarian/master/LICENSE)
-![Crates.io](https://img.shields.io/crates/d/rustc-serialize.svg)
+![Crates.io](https://img.shields.io/crates/d/hungarian.svg)
 
 A simple Rust implementation of the Hungarian (or Kuhn–Munkres) algorithm.
 Should run in `O(n^3)` time and take `O(m*n)` space, given an `m * n` rectangular
