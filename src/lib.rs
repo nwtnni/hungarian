@@ -214,20 +214,20 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
 
     // Find a zero (Z):
     // - If there is no starred zero in its row or column, then star it.
-    // - Use row_cover, col_cover to keep track of stars.
+    // - Use col_cover to keep track of stars.
     for i in 0..h {
         for j in 0..w {
+            if on!(col_cover, j) { continue }
             let k = index!(w, i, j);
-            if get!(m, k).is_zero() && off!(row_cover, i) && off!(col_cover, j) {
+            if get!(m, k).is_zero() {
                 stars.insert(k);
-                row_cover.insert(i);
                 col_cover.insert(j);
+                break
             }
         }
     }
 
     // Reset cover
-    row_cover.clear();
     col_cover.clear();
     let mut verify = true;
 
@@ -266,8 +266,10 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         // Find an uncovered zero and prime it
         let mut uncovered = None;
 
-        'outer : for i in (0..h).filter(|&i| off!(row_cover, i)) {
-            for j in (0..w).filter(|&j| off!(col_cover, j)) {
+        'outer : for i in 0..h {
+            if on!(row_cover, i) { continue }
+            for j in 0..w {
+                if on!(col_cover, j) { continue }
                 let k = index!(w, i, j);
                 if get!(m, k).is_zero() {
                     uncovered = Some((i, j));
@@ -289,15 +291,15 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
             // Find minimum uncovered value
             let mut min = N::max_value();
             for i in 0..h {
+                if on!(row_cover, i) { continue }
                 for j in 0..w {
-                    if on!(row_cover, i) || on!(col_cover, j) { continue }
+                    if on!(col_cover, j) { continue }
                     let value = get!(m, index!(w, i, j));
                     min = if value < min { value } else { min };
                 }
             }
 
             // Add minimum to covered rows
-            // Subtract minimum from uncovered columns
             for i in (0..h).filter(|&i| on!(row_cover, i)) {
                 for j in 0..w {
                     let k = index!(w, i, j);
@@ -305,6 +307,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
                 }
             }
 
+            // Subtract minimum from uncovered columns
             for j in (0..w).filter(|&j| off!(col_cover, j)) {
                 for i in 0..h {
                     let k = index!(w, i, j);
