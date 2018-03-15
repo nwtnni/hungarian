@@ -6,17 +6,12 @@ use fixedbitset::FixedBitSet;
 use num_traits::{PrimInt, NumAssign};
 use ndarray::prelude::{Array2};
 
-/// Internal macro for converting from a 2D index to a 1D index.
-macro_rules! index {
-    ($w:expr, $i:expr, $j:expr) => (($w*$i) + $j)
-}
-
-/// Internal macro for indexing a Vec without the bounds check
+/// Internal macro for indexing an Array2 without the bounds check
 macro_rules! get {
     ($m:expr, $i:expr, $j:expr) => (unsafe { *$m.uget(($i, $j)) })
 }
 
-/// Internal macro for mutating a Vec without the bounds check
+/// Internal macro for mutating an Array2 without the bounds check
 macro_rules! set {
     ($m:expr, $i:expr, $j:expr, $v: expr) => (unsafe { *$m.uget_mut(($i, $j)) = $v; })
 }
@@ -151,7 +146,7 @@ macro_rules! off {
 ///
 /// [1]: http://csclab.murraystate.edu/~bob.pilgrim/445/munkres.html
 ///
-pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usize) -> Vec<Option<usize>> {
+pub fn minimize<N: NumAssign + PrimInt + Sync + Send>(matrix: &[N], height: usize, width: usize) -> Vec<Option<usize>> {
 
     // No possible assignment
     if height == 0 || width == 0 { return Vec::new() }
@@ -170,7 +165,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
     // Clamp matrix to be positive
     for i in 0..height {
         for j in 0..width {
-            let cost = matrix[index!(width, i, j)];
+            let cost = matrix[width * i + j];
             if cost < N::zero() {
                 continue
             } else if rotated {
@@ -181,11 +176,11 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         }
     }
 
-    // The set of starred zero entries (flattened into 1D)
-    let mut stars = FixedBitSet::with_capacity(w * h);
+    // The set of starred zero entries
+    let mut stars = Array2::from_elem((h, w), false);
 
-    // The set of primed zero entries (flattened into 1D)
-    let mut primes = FixedBitSet::with_capacity(w * h);
+    // The set of primed zero entries
+    let mut primes = Array2::from_elem((h, w), false);
 
     // The set of covered row indices
     let mut row_cover = FixedBitSet::with_capacity(h);
@@ -202,7 +197,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
     // Reduce each row by its smallest element
     for mut row in m.genrows_mut() {
         let min = row.iter().min().unwrap().clone();
-        row.mapv_inplace(|v| v - min);
+        row.map_inplace(|v| *v -= min);
     }
 
     //********************************************//
@@ -218,7 +213,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         for j in 0..w {
             if on!(col_cover, j) { continue }
             if get!(m, i, j).is_zero() {
-                stars.insert(index!(w, i, j));
+                set!(stars, i, j, true);
                 col_cover.insert(j);
                 break
             }
@@ -240,9 +235,18 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         // Cover each column with a starred zero.
         // If the number of starred zeros equals the number of rows, we're done.
         if verify {
-            stars.ones().for_each(|k| col_cover.insert(k % w));
+
+            stars.gencolumns()
+                .into_iter()
+                .enumerate()
+                .for_each(|(j, col)| {
+                    if col.iter().any(|&s| s) { col_cover.insert(j) }
+                });
+
             if col_cover.count_ones(..) == h {
-                let assign = stars.ones().map(|k| k % w);
+                let assign = stars.genrows().into_iter().map(|r| {
+                    r.iter().enumerate().find(|&(_, &v)| v).map(|(i, _)| i).unwrap()
+                });
 
                 // Rotate results back if necessary
                 if rotated {
@@ -270,7 +274,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
                 if on!(col_cover, j) { continue }
                 if get!(m, i, j).is_zero() {
                     uncovered = Some((i, j));
-                    primes.insert(index!(w, i, j));
+                    set!(primes, i, j, true);
                     break 'outer;
                 }
             }
@@ -298,12 +302,12 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
 
             // Add minimum to covered rows
             for i in (0..h).filter(|&i| on!(row_cover, i)) {
-                m.row_mut(i).mapv_inplace(|c| c + min)
+                m.row_mut(i).map_inplace(|c| *c += min)
             }
 
             // Subtract minimum from uncovered columns
             for j in (0..w).filter(|&j| off!(col_cover, j)) {
-                m.column_mut(j).mapv_inplace(|c| c - min)
+                m.column_mut(j).map_inplace(|c| *c -= min)
             }
 
             // Return to [Step 4]
@@ -315,7 +319,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
 
         // Find starred zero in the same row
         let (i, j) = uncovered.unwrap();
-        let starred = (0..w).find(|&j| on!(stars, index!(w, i, j)));
+        let starred = (0..w).find(|&j| get!(stars, i, j));
 
         // Starred zero exists:
         // - Cover row of uncovered zero from [Step 4]
@@ -340,14 +344,14 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
             let (_, j) = path[path.len() - 1];
 
             // Find starred zero in same column
-            let next_star = (0..h).find(|&i| on!(stars, index!(w, i, j)));
+            let next_star = (0..h).find(|&i| get!(stars, i, j));
 
             if let None = next_star { break }
             let i = next_star.unwrap();
             path.push((i, j));
 
             // Find primed zero in same row
-            let next_prime = (0..w).find(|&j| on!(primes, index!(w, i, j)));
+            let next_prime = (0..w).find(|&j| get!(primes, i, j));
 
             let j = next_prime.expect("Guaranteed to exist");
             path.push((i, j));
@@ -356,8 +360,7 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         // Unstar each starred zero
         // Star each primed zero
         for (i, j) in path {
-            let k = index!(w, i, j);
-            stars.set(k, on!(primes, k));
+            set!(stars, i, j, *primes.uget((i, j)));
         }
 
         // Reset cover
@@ -365,13 +368,19 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         col_cover.clear();
 
         // Erase primes and return to [Step 3]
-        primes.clear();
+        primes.map_inplace(|p| *p = false);
         verify = true;
     }
 }
 
 #[cfg(test)]
 mod tests {
+
+    /// Internal macro for converting from a 2D index to a 1D index.
+    macro_rules! index {
+        ($w:expr, $i:expr, $j:expr) => (($w*$i) + $j)
+    }
+
     use minimize;
 
     #[test]
