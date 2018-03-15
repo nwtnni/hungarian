@@ -266,18 +266,13 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
         // Find an uncovered zero and prime it
         let mut uncovered = None;
 
-        {
-            let mut rows = (0..h).filter(|&i| off!(row_cover, i));
-            let mut cols = (0..w).filter(|&j| off!(col_cover, j));
-
-            'outer : for i in rows.by_ref() {
-                for j in cols.by_ref() {
-                    let k = index!(w, i, j);
-                    if get!(m, k).is_zero() {
-                        uncovered = Some((i, j));
-                        primes.insert(k);
-                        break 'outer;
-                    }
+        'outer : for i in (0..h).filter(|&i| off!(row_cover, i)) {
+            for j in (0..w).filter(|&j| off!(col_cover, j)) {
+                let k = index!(w, i, j);
+                if get!(m, k).is_zero() {
+                    uncovered = Some((i, j));
+                    primes.insert(k);
+                    break 'outer;
                 }
             }
         }
@@ -303,21 +298,17 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usiz
 
             // Add minimum to covered rows
             // Subtract minimum from uncovered columns
-            for i in 0..h {
-                if on!(row_cover, i) {
-                    for j in 0..w {
-                        let k = index!(w, i, j);
-                        set!(m, k, *m.get_unchecked(k) + min);
-                    }
+            for i in (0..h).filter(|&i| on!(row_cover, i)) {
+                for j in 0..w {
+                    let k = index!(w, i, j);
+                    set!(m, k, *m.get_unchecked(k) + min);
                 }
             }
 
-            for j in 0..w {
-                if off!(col_cover, j) {
-                    for i in 0..h {
-                        let k = index!(w, i, j);
-                        set!(m, k, *m.get_unchecked(k) - min);
-                    }
+            for j in (0..w).filter(|&j| off!(col_cover, j)) {
+                for i in 0..h {
+                    let k = index!(w, i, j);
+                    set!(m, k, *m.get_unchecked(k) - min);
                 }
             }
 
