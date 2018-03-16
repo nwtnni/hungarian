@@ -14,7 +14,40 @@ Derived and modified from [this great explanation](http://csclab.murraystate.edu
 
 ## Usage
 
-Check out the [documentation!](https://docs.rs/hungarian/)
+Add the following to your `Cargo.toml` file:
+
+```
+[dependencies]
+hungarian = "1.1.0"
+```
+
+Add the following to the top of your binary or library:
+
+```
+extern crate hungarian;
+
+use hungarian::minimize;
+```
+
+And you should be good to go!
+[For more information, check out the documentation.](https://docs.rs/hungarian/)
+
+## Recent Changes
+
+- 1.1.0
+  - Greatly optimized performance (by a factor of 2-4 on benchmarks on matrices from 5x5 to 100x100)
+  - Now uses `num-trait` to take generic integer weights
+  - Now backed by `ndarray` to scale better with larger inputs
+- 1.0.0 
+  - Greatly improved source code documentation
+  - Renamed `hungarian` function to `minimize`
+  - Now handle arbitrary rectangular matrices
+  - Added more test cases to cover non-square matrices
+  - Now returns `Vec<Option<Usize>>` to handle when not all columns are assigned to rows
+- 0.1.0
+  - Initial release 
+  - Working base algorithm, but only works for square matrices.
+  - Not well documented
 
 ## Notes
 
@@ -51,15 +84,15 @@ C(i, j) = (i + 1)(j + 1)  |  C(i, j) = (i * width) + j
 
 | Cost Matrix | Matrix Size | Average Runtime |  Iterations |
 |:------------|------------:|----------------:|------------:|
-| Worst-Case  |     5 x   5 |         3.13 us | 1\_600\_000 |
-| Worst-Case  |    10 x  10 |        36.85 us |    141\_000 |
-| Worst-Case  |    25 x  25 |         1.20 ms |      5\_050 |
-| Worst-Case  |    50 x  50 |        19.62 ms |      5\_050 |
-| Generic     |     5 x   5 |         2.22 us | 2\_100\_000 |
-| Generic     |    10 x  10 |        12.69 us |    379\_000 |
-| Generic     |    25 x  25 |       182.48 us |     30\_000 |
-| Generic     |    50 x  50 |         1.84 ms |      5\_050 |
-| Generic     |   100 x 100 |        19.17 ms |      5\_050 |
+| Worst-Case  |     5 x   5 |         2.42 us | 2\_000\_000 |
+| Worst-Case  |    10 x  10 |        20.38 us |    247\_000 |
+| Worst-Case  |    25 x  25 |       546.88 us |     10\_000 |
+| Worst-Case  |    50 x  50 |         6.97 ms |      5\_050 |
+| Generic     |     5 x   5 |         1.75 us | 2\_800\_000 |
+| Generic     |    10 x  10 |         7.49 us |    667\_000 |
+| Generic     |    25 x  25 |        86.33 us |     61\_000 |
+| Generic     |    50 x  50 |       556.48 us |     10\_000 |
+| Generic     |   100 x 100 |         3.97 ms |      5\_050 |
 
 Measured on a quad-core 2.6GHz Intel(R) i7-6700HQ with
 16GB RAM; using Ubuntu 16.04 Linux x86\_64 4.8.0-53-generic

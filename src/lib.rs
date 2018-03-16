@@ -4,7 +4,7 @@ extern crate ndarray;
 
 use fixedbitset::FixedBitSet;
 use num_traits::{PrimInt, NumAssign};
-use ndarray::prelude::{Array2};
+use ndarray::prelude::Array2;
 
 /// Internal macro for indexing an Array2 without the bounds check
 macro_rules! get {
@@ -146,7 +146,7 @@ macro_rules! off {
 ///
 /// [1]: http://csclab.murraystate.edu/~bob.pilgrim/445/munkres.html
 ///
-pub fn minimize<N: NumAssign + PrimInt + Sync + Send>(matrix: &[N], height: usize, width: usize) -> Vec<Option<usize>> {
+pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], height: usize, width: usize) -> Vec<Option<usize>> {
 
     // No possible assignment
     if height == 0 || width == 0 { return Vec::new() }
@@ -162,7 +162,7 @@ pub fn minimize<N: NumAssign + PrimInt + Sync + Send>(matrix: &[N], height: usiz
     let (w, h) = if rotated { (height, width) } else { (width, height) };
     let mut m = Array2::zeros((h, w));
 
-    // Clamp matrix to be positive
+    // Clamp matrix to be positive and rotate if necessary
     for i in 0..height {
         for j in 0..width {
             let cost = matrix[width * i + j];
@@ -226,16 +226,15 @@ pub fn minimize<N: NumAssign + PrimInt + Sync + Send>(matrix: &[N], height: usiz
 
     loop {
 
-        //********************************************//
-        //                                            //
-        //                   Step 3                   //
-        //                                            //
-        //********************************************//
-
-        // Cover each column with a starred zero.
-        // If the number of starred zeros equals the number of rows, we're done.
         if verify {
 
+            //********************************************//
+            //                                            //
+            //                   Step 3                   //
+            //                                            //
+            //********************************************//
+
+            // Cover each column with a starred zero.
             stars.gencolumns()
                 .into_iter()
                 .enumerate()
@@ -243,9 +242,14 @@ pub fn minimize<N: NumAssign + PrimInt + Sync + Send>(matrix: &[N], height: usiz
                     if col.iter().any(|&s| s) { col_cover.insert(j) }
                 });
 
+            // If the number of starred zeros equals the number of rows, we're done.
             if col_cover.count_ones(..) == h {
+
                 let assign = stars.genrows().into_iter().map(|r| {
-                    r.iter().enumerate().find(|&(_, &v)| v).map(|(i, _)| i).unwrap()
+                    r.iter().enumerate()
+                        .find(|&(_, &v)| v)
+                        .map(|(i, _)| i)
+                        .unwrap()
                 });
 
                 // Rotate results back if necessary
@@ -265,9 +269,9 @@ pub fn minimize<N: NumAssign + PrimInt + Sync + Send>(matrix: &[N], height: usiz
         //                                            //
         //********************************************//
 
-        // Find an uncovered zero and prime it
         let mut uncovered = None;
 
+        // Find an uncovered zero and prime it
         'outer : for i in 0..h {
             if on!(row_cover, i) { continue }
             for j in 0..w {
@@ -317,15 +321,13 @@ pub fn minimize<N: NumAssign + PrimInt + Sync + Send>(matrix: &[N], height: usiz
             continue
         }
 
-        // Find starred zero in the same row
         let (i, j) = uncovered.unwrap();
-        let starred = (0..w).find(|&j| get!(stars, i, j));
 
-        // Starred zero exists:
+        // If there's a starred zero in the same row
         // - Cover row of uncovered zero from [Step 4]
         // - Uncover column of starred zero
         // - Repeat [Step 4]
-        if let Some(j) = starred {
+        if let Some(j) = (0..w).find(|&j| get!(stars, i, j)) {
             row_cover.insert(i);
             col_cover.set(j, false);
             verify = false;
@@ -351,9 +353,8 @@ pub fn minimize<N: NumAssign + PrimInt + Sync + Send>(matrix: &[N], height: usiz
             path.push((i, j));
 
             // Find primed zero in same row
-            let next_prime = (0..w).find(|&j| get!(primes, i, j));
-
-            let j = next_prime.expect("Guaranteed to exist");
+            // Guaranteed to exist
+            let j = (0..w).find(|&j| get!(primes, i, j)).unwrap();
             path.push((i, j));
         }
 
@@ -809,7 +810,7 @@ mod tests {
 
     #[test]
     fn test_large() {
-        let max = 500;
+        let max = 1000;
         let mut matrix = vec![0; max * max];
         let mut n: u64 = 0;
 
