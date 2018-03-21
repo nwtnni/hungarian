@@ -8,7 +8,7 @@ use hungarian::minimize;
 fn bench_hungarian(c: &mut Criterion) {
     c.bench_function_over_inputs("hungarian_NxN", |b, &&max| {
         let mut matrix = vec![0; max * max];
-        let mut n: u64 = 0;
+        let mut n: i32 = 0;
         
         for i in 0..max {
             for j in 0..max {
@@ -26,7 +26,7 @@ fn bench_hungarian_worst_case(c: &mut Criterion) {
         
         for i in 0..max {
             for j in 0..max {
-                matrix[max*i + j] = ((i + 1)*(j + 1)) as u64;
+                matrix[max*i + j] = ((i + 1)*(j + 1)) as i32;
             }
         }
 
