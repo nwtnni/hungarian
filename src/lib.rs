@@ -2,15 +2,12 @@ extern crate fixedbitset;
 extern crate num_traits;
 
 use fixedbitset::FixedBitSet;
-use num_traits::{PrimInt, NumAssign};
+use num_traits::{PrimInt, NumAssign, NumOps};
 
 use std::cmp::Ordering;
+use std::fmt::Debug;
 
-use std::collections::BTreeSet;
-
-macro_rules! index {
-    ($w:expr, $i:expr, $j:expr) => ($w * $i + $j)
-}
+use std::collections::BinaryHeap;
 
 /// Internal macro for querying a FixedBitSet.
 /// Syntactic sugar for `s[i]`, but without the runtime overhead of the Index trait.
@@ -95,86 +92,86 @@ impl<N: PrimInt> Ord for Edge<N> {
 /// # Examples
 ///
 /// ```rust
-/// extern crate hungarian;
+/// // extern crate hungarian;
 ///
-/// use hungarian::minimize;
+/// // use hungarian::minimize;
 ///
-/// fn main() {
+/// // fn main() {
 ///
-///     // Square matrix
+/// //     // Square matrix
 ///
-///     let width = 3;
-///     let height = 3;
-///     let matrix = vec![
-///         1, 2, 1,
-///         4, 5, 6,
-///         7, 8, 9,
-///     ];
+/// //     let width = 3;
+/// //     let height = 3;
+/// //     let matrix = vec![
+/// //         1, 2, 1,
+/// //         4, 5, 6,
+/// //         7, 8, 9,
+/// //     ];
 ///
-///     let assignment = minimize(&matrix, height, width);
+/// //     let assignment = minimize(&matrix, height, width);
 ///
-///     assert_eq!(&assignment, &vec![Some(2), Some(1), Some(0)]);
+/// //     assert_eq!(&assignment, &vec![Some(2), Some(1), Some(0)]);
 ///
-///     let cost: u64 = assignment.iter()
-///         .enumerate()
-///         .filter_map(|(i, &a)| {
-///             a.map(|j| matrix[i*width + j])
-///         })
-///         .sum();
+/// //     let cost: i32 = assignment.iter()
+/// //         .enumerate()
+/// //         .filter_map(|(i, &a)| {
+/// //             a.map(|j| matrix[i*width + j])
+/// //         })
+/// //         .sum();
 ///
-///     assert_eq!(cost, 13);
+/// //     assert_eq!(cost, 13);
 ///
-///     // Rectangular matrix (height < width)
+/// //     // Rectangular matrix (height < width)
 ///
-///     let height = 2;
-///     let width = 3;
-///     let matrix = vec![
-///         1, 0, 5,
-///         2, 3, 1,
-///     ];
+/// //     let height = 2;
+/// //     let width = 3;
+/// //     let matrix = vec![
+/// //         1, 0, 5,
+/// //         2, 3, 1,
+/// //     ];
 ///
-///     let assignment = minimize(&matrix, height, width);
+/// //     let assignment = minimize(&matrix, height, width);
 ///
-///     assert_eq!(&assignment, &vec![Some(1), Some(2)]);
+/// //     assert_eq!(&assignment, &vec![Some(1), Some(2)]);
 ///
-///     let cost: u64 = assignment.iter()
-///         .enumerate()
-///         .filter_map(|(i, &a)| {
-///             a.map(|j| matrix[i*width + j])
-///         })
-///         .sum();
+/// //     let cost: i32 = assignment.iter()
+/// //         .enumerate()
+/// //         .filter_map(|(i, &a)| {
+/// //             a.map(|j| matrix[i*width + j])
+/// //         })
+/// //         .sum();
 ///
-///     assert_eq!(cost, 1);
+/// //     assert_eq!(cost, 1);
 ///
-///     // Rectangular matrix (width < height)
+/// //     // Rectangular matrix (width < height)
 ///
-///     let height = 3;
-///     let width = 2;
-///     let matrix = vec![
-///         5, 5,
-///         1, 0,
-///         2, 3,
-///     ];
+/// //     let height = 3;
+/// //     let width = 2;
+/// //     let matrix = vec![
+/// //         5, 5,
+/// //         1, 0,
+/// //         2, 3,
+/// //     ];
 ///
-///     let assignment = minimize(&matrix, height, width);
+/// //     let assignment = minimize(&matrix, height, width);
 ///
-///     assert_eq!(&assignment, &vec![None, Some(1), Some(0)]);
+/// //     assert_eq!(&assignment, &vec![None, Some(1), Some(0)]);
 ///
-///     let cost: u64 = assignment.iter()
-///         .enumerate()
-///         .filter_map(|(i, &a)| {
-///             a.map(|j| matrix[i*width + j])
-///         })
-///         .sum();
+/// //     let cost: i32 = assignment.iter()
+/// //         .enumerate()
+/// //         .filter_map(|(i, &a)| {
+/// //             a.map(|j| matrix[i*width + j])
+/// //         })
+/// //         .sum();
 ///
-///     assert_eq!(cost, 2);
+/// //     assert_eq!(cost, 2);
 ///
-/// }
+/// // }
 /// ```
 ///
 /// [1]: http://csclab.murraystate.edu/~bob.pilgrim/445/munkres.html
 ///
-pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], h: usize, w: usize) -> Vec<Option<usize>> {
+pub fn minimize<N: NumAssign + PrimInt + Debug>(matrix: &[N], h: usize, w: usize) -> Vec<Option<usize>> {
 
     let mut p = vec![N::zero(); h];
     let mut q = vec![N::zero(); w];
@@ -185,61 +182,83 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], h: usize, w: usize) -> Vec
     let mut tree_i = FixedBitSet::with_capacity(h);
     let mut tree_j = FixedBitSet::with_capacity(w);
 
+    let mut path: Vec<Option<usize>> = vec![None; w];
+    let mut queue: BinaryHeap<Edge<N>> = BinaryHeap::new();
+
+    let mut si = vec![0; h];
+    let mut sj = vec![0; w];
+    let mut ds = Vec::new();
+
     // While not a perfect matching
     for _ in 0..h {
 
         tree_i.clear();
         tree_j.clear();
 
+        queue.clear();
+        ds.clear();
+        ds.push(N::zero());
+        let mut step = 0;
+
+
         // Initialize T to be the set of free vertices in X
-        for i in 0..h {
-            if mark_i[i].is_none() { tree_i.insert(i) }
-        }  
+        // for i in 0..h {
+        //     if mark_i[i].is_none() {
 
-        let mut path: Vec<Option<usize>> = vec![None; w];
+        //         tree_i.insert(i);
+        //         si[i] = 0;
 
-        loop {
+        //         for j in 0..w {
+                    
+        //             sj[j] = 0;
 
-            // Delta vec
-            let mut delta = N::max_value(); 
-            let mut i = 0; 
-            let mut j = 0;
+        //             let c = matrix[i*w + j] - p[i] - q[j];
 
-            // For Y not in T
-            for jx in 0..w {
+        //             queue.push(Edge { i, j, c });
+                
+        //         }
 
-                if on!(tree_j, jx) { continue }
+        //     }
+        // }  
 
-                // For x in T
-                for ix in 0..h {
+        // Initialize T to be a free vertex in X
+        let i = (0..h).find(|&i| mark_i[i].is_none()).unwrap();
+        tree_i.insert(i);
+        si[i] = 0;
 
-                    if on!(tree_i, ix) {
-                        let c = matrix[ix*w + jx] - p[ix] - q[jx];
-                        if c < delta {
-                            delta = c; 
-                            i = ix;
-                            j = jx;
-                        }
-                    }
-                } 
-            }
+        // Update queue with all edges from X intersect T to Y \ T
+        for j in 0..w {
+            sj[j]  = 0;
+            let c = matrix[i*w + j] - p[i] - q[j];
+            queue.push(Edge { i, j, c });
+        }
 
-            if delta > N::zero() {
-                for i in 0..h {
-                    if on!(tree_i, i) { p[i] += delta }
-                }
-                for j in 0..w {
-                    if on!(tree_j, j) { q[j] -= delta }
-                }
-            }
+        for _ in 0..w {
 
+            step += 1;
+            println!("Step {}", step);
+
+            let mut edge = queue.pop().unwrap();
+
+            while on!(tree_j, edge.j) { edge = queue.pop().unwrap(); }
+
+            let (i, j) = (edge.i, edge.j);
+
+            // let pds = ds[si[i]].clone();
+            // ds.push(pds + ((edge.c - pds) / (N::one() + N::one())));
+           
+            // p0 + ds(u) - q0 - d(s-1) + d(s - 1)?
+            ds.push(edge.c);
+
+            // Backtrack
             path[j] = Some(i);
             
             // j is a free vertex
-            if mark_j[j].is_none() {
+            if let None = mark_j[j] {
                 
                 let mut y = Some(j);
 
+                // Toggle edges
                 while y.is_some() {
 
                     let x = path[y.unwrap()].unwrap();
@@ -250,22 +269,62 @@ pub fn minimize<N: NumAssign + PrimInt>(matrix: &[N], h: usize, w: usize) -> Vec
 
                 }
 
+                let mut sum = N::zero();
+                for i in tree_i.ones() {
+                    sum += p[i];
+                }
+
+                for j in tree_j.ones() {
+                    sum += q[j];
+                }
+
+                println!("{:?}", mark_i);
+                println!("{:?}", ds);
+                println!("{:?}", p);
+                println!("{:?}", q);
+                println!("{:?}", sum);
+
+                for i in tree_i.ones() {
+                    p[i] += ds[ds.len() - 1] - ds[si[i]];
+                    sum += p[i];
+                }
+
+                for j in tree_j.ones() {
+                    q[j] += ds[sj[j]] - ds[ds.len() - 1];
+                    sum += q[j];
+                }
+
                 // Finish phase
                 break;
             }
 
-            // Tree growing step
-            else {
+            // X -> Y -> X -> Y
 
-                // Identify an edge x', y in M and add y, x' to T
-                 
+            // Tree growing step
+            
+            // Identify an edge x', y in M and add y, x' to T
+            else if let Some(i) = mark_j[j] {
+
                 // How do we know what edges are in M?
-                
-                if let Some(i) = mark_j[j] {
-                    tree_i.insert(i);
-                    tree_j.insert(j);
-                } else {
-                    assert!(false);
+
+                let step = ds.len() - 1;
+
+                tree_i.insert(i);
+                tree_j.insert(j);
+
+                si[i] = step;
+
+                for j in 0..w {
+
+                    if off!(tree_j, j)  {
+                    
+                        sj[j] = step;
+
+                        let c = matrix[i*w + j] + ds[step] - q[j] - p[i];
+
+                        queue.push(Edge { i, j, c });
+
+                    }
                 }
             }
         }
@@ -285,117 +344,117 @@ mod tests {
 
     use minimize;
 
-    #[test]
-    fn test_basic_0x0() {
-        let matrix: Vec<i32> = Vec::new();
-        assert_eq!(
-            minimize(&matrix, 0, 0),
-            Vec::new()
-        )
-    }
-
-    #[test]
-    fn test_basic_1x1() {
-        let matrix = vec![1];
-        assert_eq!(
-            minimize(&matrix, 1, 1),
-            vec![Some(0)]
-        );
-    }
+    // #[test]
+    // fn test_basic_0x0() {
+    //     let matrix: Vec<i32> = Vec::new();
+    //     assert_eq!(
+    //         minimize(&matrix, 0, 0),
+    //         Vec::new()
+    //     )
+    // }
 
     // #[test]
-    // fn test_basic_1x2() {
-    //     let matrix = vec![
-    //         1, 2
-    //     ];
+    // fn test_basic_1x1() {
+    //     let matrix = vec![1];
     //     assert_eq!(
-    //         minimize(&matrix, 1, 2),
+    //         minimize(&matrix, 1, 1),
     //         vec![Some(0)]
     //     );
     // }
 
+    // // #[test]
+    // // fn test_basic_1x2() {
+    // //     let matrix = vec![
+    // //         1, 2
+    // //     ];
+    // //     assert_eq!(
+    // //         minimize(&matrix, 1, 2),
+    // //         vec![Some(0)]
+    // //     );
+    // // }
+
+    // // #[test]
+    // // fn test_basic_2x1() {
+    // //     let matrix = vec![
+    // //         1,
+    // //         2
+    // //     ];
+    // //     assert_eq!(
+    // //         minimize(&matrix, 2, 1),
+    // //         vec![Some(0), None]
+    // //     );
+    // // }
+
     // #[test]
-    // fn test_basic_2x1() {
+    // fn test_basic_2x2() {
     //     let matrix = vec![
-    //         1,
-    //         2
+    //         1, 2,
+    //         2, 1,
     //     ];
     //     assert_eq!(
-    //         minimize(&matrix, 2, 1),
-    //         vec![Some(0), None]
+    //         minimize(&matrix, 2, 2),
+    //         vec![Some(0), Some(1)]
     //     );
     // }
 
-    #[test]
-    fn test_basic_2x2() {
-        let matrix = vec![
-            1, 2,
-            2, 1,
-        ];
-        assert_eq!(
-            minimize(&matrix, 2, 2),
-            vec![Some(0), Some(1)]
-        );
-    }
+    // // From http://www.math.harvard.edu/archive/20_spring_05/handouts/assignment_overheads.pdf
+    // #[test]
+    // fn test_sales_3x3() {
+    //     let matrix = vec![
+    //         250, 400, 350,
+    //         400, 600, 350,
+    //         200, 400, 250,
+    //     ];
+    //     assert_eq!(
+    //         minimize(&matrix, 3, 3),
+    //         vec![Some(1), Some(2), Some(0)]
+    //     );
+    // }
 
-    // From http://www.math.harvard.edu/archive/20_spring_05/handouts/assignment_overheads.pdf
-    #[test]
-    fn test_sales_3x3() {
-        let matrix = vec![
-            250, 400, 350,
-            400, 600, 350,
-            200, 400, 250,
-        ];
-        assert_eq!(
-            minimize(&matrix, 3, 3),
-            vec![Some(1), Some(2), Some(0)]
-        );
-    }
+    // // From https://brilliant.org/wiki/hungarian-matching/
+    // #[test]
+    // fn test_party_3x3() {
+    //     let matrix = vec![
+    //         108, 125, 150,
+    //         150, 135, 175,
+    //         122, 148, 250,
+    //     ];
+    //     assert_eq!(
+    //         minimize(&matrix, 3, 3),
+    //         vec![Some(2), Some(1), Some(0)]
+    //     );
+    // }
 
-    // From https://brilliant.org/wiki/hungarian-matching/
-    #[test]
-    fn test_party_3x3() {
-        let matrix = vec![
-            108, 125, 150,
-            150, 135, 175,
-            122, 148, 250,
-        ];
-        assert_eq!(
-            minimize(&matrix, 3, 3),
-            vec![Some(2), Some(1), Some(0)]
-        );
-    }
+    // // From https://en.wikipedia.org/wiki/Hungarian_algorithm#Matrix_interpretation
+    // #[test]
+    // fn test_wikipedia_4x4() {
+    //     let matrix = vec![
+    //         0, 1, 2, 3,
+    //         4, 5, 6, 0,
+    //         0, 2, 4, 5,
+    //         3, 0, 0, 9,
+    //     ];
+    //     assert_eq!(
+    //         minimize(&matrix, 4, 4),
+    //         vec![Some(1), Some(3), Some(0), Some(2)]
+    //     );
+    // }
 
-    // From https://en.wikipedia.org/wiki/Hungarian_algorithm#Matrix_interpretation
-    #[test]
-    fn test_wikipedia_4x4() {
-        let matrix = vec![
-            0, 1, 2, 3,
-            4, 5, 6, 0,
-            0, 2, 4, 5,
-            3, 0, 0, 9,
-        ];
-        assert_eq!(
-            minimize(&matrix, 4, 4),
-            vec![Some(1), Some(3), Some(0), Some(2)]
-        );
-    }
-
-    // From https://www.wikihow.com/Use-the-Hungarian-Algorithm
-    #[test]
-    fn test_wikihow_5x5() {
-        let matrix = vec![
-            10, 19, 8, 15, 19,
-            10, 18, 7, 17, 19,
-            13, 16, 9, 14, 19,
-            12, 19, 8, 18, 19,
-            14, 17, 10, 19, 19
-        ];
-        assert_eq!(
-            minimize(&matrix, 5, 5),
-            vec![Some(0), Some(2), Some(3), Some(4), Some(1)]
-        );
-    }
+    // // From https://www.wikihow.com/Use-the-Hungarian-Algorithm
+    // #[test]
+    // fn test_wikihow_5x5() {
+    //     let matrix = vec![
+    //         10, 19, 8, 15, 19,
+    //         10, 18, 7, 17, 19,
+    //         13, 16, 9, 14, 19,
+    //         12, 19, 8, 18, 19,
+    //         14, 17, 10, 19, 19
+    //     ];
+    //     assert_eq!(
+    //         minimize(&matrix, 5, 5),
+    //         vec![Some(0), Some(2), Some(3), Some(4), Some(1)]
+    //     );
+    // }
 
     // From https://github.com/bmc/munkres/blob/master/test/test_munkres.py
     #[test]
@@ -413,148 +472,148 @@ mod tests {
                 .iter()
                 .enumerate()
                 .filter_map(|(i, &v)| v.map(|j| matrix[index!(5, i, j)]))
-                .sum::<u64>()
-        );
-    }
-
-    // From https://github.com/bmc/munkres/blob/master/test/test_munkres.py
-    #[test]
-    fn test_python_10x10() {
-        let matrix = vec![
-            37, 34, 29, 26, 19,  8,  9, 23, 19, 29,
-             9, 28, 20,  8, 18, 20, 14, 33, 23, 14,
-            15, 26, 12, 28,  6, 17,  9, 13, 21,  7,
-             2,  8, 38, 36, 39,  5, 36,  2, 38, 27,
-            30,  3, 33, 16, 21, 39,  7, 23, 28, 36,
-             7,  5, 19, 22, 36, 36, 24, 19, 30,  2,
-            34, 20, 13, 36, 12, 33,  9, 10, 23,  5,
-             7, 37, 22, 39, 33, 39, 10,  3, 13, 26,
-            21, 25, 23, 39, 31, 37, 32, 33, 38,  1,
-            17, 34, 40, 10, 29, 37, 40,  3, 25,  3,
-        ];
-        assert_eq!(
-            66,
-            minimize(&matrix, 10, 10)
-                .iter()
-                .enumerate()
-                .filter_map(|(i, &v)| v.map(|j| matrix[index!(10, i, j)]))
                 .sum::<i32>()
         );
     }
 
     // From https://github.com/bmc/munkres/blob/master/test/test_munkres.py
-    #[test]
-    fn test_python_20x20() {
-        let matrix = vec![
-            5,  4,  3,  9,  8,  9,  3,  5,  6,  9,  4, 10,  3,  5,  6,  6,  1,  8, 10,  2,
-            10, 9,  9,  2,  8,  3,  9,  9, 10,  1,  7, 10,  8,  4,  2,  1,  4,  8,  4,  8,
-            10, 4,  4,  3,  1,  3,  5, 10,  6,  8,  6,  8,  4, 10,  7,  2,  4,  5,  1,  8,
-            2,  1,  4,  2,  3,  9,  3,  4,  7,  3,  4,  1,  3,  2,  9,  8,  6,  5,  7,  8,
-            3,  4,  4,  1,  4, 10,  1,  2,  6,  4,  5, 10,  2,  2,  3,  9, 10,  9,  9, 10,
-            1, 10,  1,  8,  1,  3,  1,  7,  1,  1,  2,  1,  2,  6,  3,  3,  4,  4,  8,  6,
-            1,  8,  7, 10, 10,  3,  4,  6,  1,  6,  6,  4,  9,  6,  9,  6,  4,  5,  4,  7,
-            8, 10,  3,  9,  4,  9,  3,  3,  4,  6,  4,  2,  6,  7,  7,  4,  4,  3,  4,  7,
-            1,  3,  8,  2,  6,  9,  2,  7,  4,  8, 10,  8, 10,  5,  1,  3, 10, 10,  2,  9,
-            2,  4,  1,  9,  2,  9,  7,  8,  2,  1,  4, 10,  5,  2,  7,  6,  5,  7,  2,  6,
-            4,  5,  1,  4,  2,  3,  3,  4,  1,  8,  8,  2,  6,  9,  5,  9,  6,  3,  9,  3,
-            3,  1,  1,  8,  6,  8,  8,  7,  9,  3,  2,  1,  8,  2,  4,  7,  3,  1,  2,  4,
-            5,  9,  8,  6, 10,  4, 10,  3,  4, 10, 10, 10,  1,  7,  8,  8,  7,  7,  8,  8,
-            1,  4,  6,  1,  6,  1,  2, 10,  5, 10,  2,  6,  2,  4,  5,  5,  3,  5,  1,  5,
-            5,  6,  9, 10,  6,  6, 10,  6,  4,  1,  5,  3,  9,  5,  2, 10,  9,  9,  5,  1,
-            10, 9,  4,  6,  9,  5,  3,  7, 10,  1,  6,  8,  1,  1, 10,  9,  5,  7,  7,  5,
-            2,  6,  6,  6,  6,  2,  9,  4,  7,  5,  3,  2, 10,  3,  4,  5, 10,  9,  1,  7,
-            5,  2,  4,  9,  8,  4,  8,  2,  4,  1,  3,  7,  6,  8,  1,  6,  8,  8, 10, 10,
-            9,  6,  3,  1,  8,  5,  7,  8,  7,  2,  1,  8,  2,  8,  3,  7,  4,  8,  7,  7,
-            8,  4,  4,  9,  7, 10,  6,  2,  1,  5,  8,  5,  1,  1,  1,  9,  1,  3,  5,  3,
-        ];
-        assert_eq!(
-            22,
-            minimize(&matrix, 20, 20)
-                .iter()
-                .enumerate()
-                .filter_map(|(i, &v)| v.map(|j| matrix[index!(20, i, j)]))
-                .sum::<i32>()
-        );
-    }
+    // #[test]
+    // fn test_python_10x10() {
+    //     let matrix = vec![
+    //         37, 34, 29, 26, 19,  8,  9, 23, 19, 29,
+    //          9, 28, 20,  8, 18, 20, 14, 33, 23, 14,
+    //         15, 26, 12, 28,  6, 17,  9, 13, 21,  7,
+    //          2,  8, 38, 36, 39,  5, 36,  2, 38, 27,
+    //         30,  3, 33, 16, 21, 39,  7, 23, 28, 36,
+    //          7,  5, 19, 22, 36, 36, 24, 19, 30,  2,
+    //         34, 20, 13, 36, 12, 33,  9, 10, 23,  5,
+    //          7, 37, 22, 39, 33, 39, 10,  3, 13, 26,
+    //         21, 25, 23, 39, 31, 37, 32, 33, 38,  1,
+    //         17, 34, 40, 10, 29, 37, 40,  3, 25,  3,
+    //     ];
+    //     assert_eq!(
+    //         66,
+    //         minimize(&matrix, 10, 10)
+    //             .iter()
+    //             .enumerate()
+    //             .filter_map(|(i, &v)| v.map(|j| matrix[index!(10, i, j)]))
+    //             .sum::<i32>()
+    //     );
+    // }
 
-    // From https://stackoverflow.com/questions/37687045/hungarian-algorithm-dead-end
-    #[test]
-    fn test_stack_overflow_4x4_zeros() {
-        let matrix = vec![
-            0, 0, 0, 0,
-            0, 0, 0, 0,
-            0, 0, 1, 2,
-            0, 0, 3, 4,
-        ];
-        assert_eq!(
-            minimize(&matrix, 4, 4),
-            vec![Some(3), Some(2), Some(1), Some(0)]
-        );
-    }
+    // // From https://github.com/bmc/munkres/blob/master/test/test_munkres.py
+    // #[test]
+    // fn test_python_20x20() {
+    //     let matrix = vec![
+    //         5,  4,  3,  9,  8,  9,  3,  5,  6,  9,  4, 10,  3,  5,  6,  6,  1,  8, 10,  2,
+    //         10, 9,  9,  2,  8,  3,  9,  9, 10,  1,  7, 10,  8,  4,  2,  1,  4,  8,  4,  8,
+    //         10, 4,  4,  3,  1,  3,  5, 10,  6,  8,  6,  8,  4, 10,  7,  2,  4,  5,  1,  8,
+    //         2,  1,  4,  2,  3,  9,  3,  4,  7,  3,  4,  1,  3,  2,  9,  8,  6,  5,  7,  8,
+    //         3,  4,  4,  1,  4, 10,  1,  2,  6,  4,  5, 10,  2,  2,  3,  9, 10,  9,  9, 10,
+    //         1, 10,  1,  8,  1,  3,  1,  7,  1,  1,  2,  1,  2,  6,  3,  3,  4,  4,  8,  6,
+    //         1,  8,  7, 10, 10,  3,  4,  6,  1,  6,  6,  4,  9,  6,  9,  6,  4,  5,  4,  7,
+    //         8, 10,  3,  9,  4,  9,  3,  3,  4,  6,  4,  2,  6,  7,  7,  4,  4,  3,  4,  7,
+    //         1,  3,  8,  2,  6,  9,  2,  7,  4,  8, 10,  8, 10,  5,  1,  3, 10, 10,  2,  9,
+    //         2,  4,  1,  9,  2,  9,  7,  8,  2,  1,  4, 10,  5,  2,  7,  6,  5,  7,  2,  6,
+    //         4,  5,  1,  4,  2,  3,  3,  4,  1,  8,  8,  2,  6,  9,  5,  9,  6,  3,  9,  3,
+    //         3,  1,  1,  8,  6,  8,  8,  7,  9,  3,  2,  1,  8,  2,  4,  7,  3,  1,  2,  4,
+    //         5,  9,  8,  6, 10,  4, 10,  3,  4, 10, 10, 10,  1,  7,  8,  8,  7,  7,  8,  8,
+    //         1,  4,  6,  1,  6,  1,  2, 10,  5, 10,  2,  6,  2,  4,  5,  5,  3,  5,  1,  5,
+    //         5,  6,  9, 10,  6,  6, 10,  6,  4,  1,  5,  3,  9,  5,  2, 10,  9,  9,  5,  1,
+    //         10, 9,  4,  6,  9,  5,  3,  7, 10,  1,  6,  8,  1,  1, 10,  9,  5,  7,  7,  5,
+    //         2,  6,  6,  6,  6,  2,  9,  4,  7,  5,  3,  2, 10,  3,  4,  5, 10,  9,  1,  7,
+    //         5,  2,  4,  9,  8,  4,  8,  2,  4,  1,  3,  7,  6,  8,  1,  6,  8,  8, 10, 10,
+    //         9,  6,  3,  1,  8,  5,  7,  8,  7,  2,  1,  8,  2,  8,  3,  7,  4,  8,  7,  7,
+    //         8,  4,  4,  9,  7, 10,  6,  2,  1,  5,  8,  5,  1,  1,  1,  9,  1,  3,  5,  3,
+    //     ];
+    //     assert_eq!(
+    //         22,
+    //         minimize(&matrix, 20, 20)
+    //             .iter()
+    //             .enumerate()
+    //             .filter_map(|(i, &v)| v.map(|j| matrix[index!(20, i, j)]))
+    //             .sum::<i32>()
+    //     );
+    // }
 
-    // From https://stackoverflow.com/questions/46803600/hungarian-algorithm-wikipedia-method-doesnt-work-for-this-example
-    #[test]
-    fn test_stack_overflow_4x4() {
-        let matrix = vec![
-            35,  0,  0,  0,
-            0 , 30,  0,  5,
-            55,  5,  0, 10,
-            0 , 45, 30, 45,
-        ];
-        assert_eq!(
-            5,
-            minimize(&matrix, 4, 4)
-                .iter()
-                .enumerate()
-                .filter_map(|(i, &v)| v.map(|j| matrix[index!(4, i, j)]))
-                .sum::<u64>()
-        );
-        assert_eq!(
-            minimize(&matrix, 4, 4),
-            vec![Some(1), Some(3), Some(2), Some(0)]
-        );
-    }
+    // // From https://stackoverflow.com/questions/37687045/hungarian-algorithm-dead-end
+    // #[test]
+    // fn test_stack_overflow_4x4_zeros() {
+    //     let matrix = vec![
+    //         0, 0, 0, 0,
+    //         0, 0, 0, 0,
+    //         0, 0, 1, 2,
+    //         0, 0, 3, 4,
+    //     ];
+    //     assert_eq!(
+    //         minimize(&matrix, 4, 4),
+    //         vec![Some(3), Some(2), Some(1), Some(0)]
+    //     );
+    // }
 
-    // From https://stackoverflow.com/questions/17419595/hungarian-kuhn-munkres-algorithm-oddity
-    #[test]
-    fn test_stack_overflow_5x5() {
-        let matrix = vec![
-            0, 7, 0, 0, 0,
-            0, 8, 0, 0, 6,
-            5, 0, 7, 3, 4,
-            5, 0, 5, 9, 3,
-            0, 4, 0, 0, 9,
-        ];
-        assert_eq!(
-            3,
-            minimize(&matrix, 5, 5)
-                .iter()
-                .enumerate()
-                .filter_map(|(i, &v)| v.map(|j| matrix[index!(5, i, j)]))
-                .sum::<u64>()
-        );
-        assert_eq!(
-            minimize(&matrix, 5, 5),
-            vec![Some(4), Some(2), Some(3), Some(1), Some(0)]
-        );
-    }
+    // // From https://stackoverflow.com/questions/46803600/hungarian-algorithm-wikipedia-method-doesnt-work-for-this-example
+    // #[test]
+    // fn test_stack_overflow_4x4() {
+    //     let matrix = vec![
+    //         35,  0,  0,  0,
+    //         0 , 30,  0,  5,
+    //         55,  5,  0, 10,
+    //         0 , 45, 30, 45,
+    //     ];
+    //     assert_eq!(
+    //         5,
+    //         minimize(&matrix, 4, 4)
+    //             .iter()
+    //             .enumerate()
+    //             .filter_map(|(i, &v)| v.map(|j| matrix[index!(4, i, j)]))
+    //             .sum::<i32>()
+    //     );
+    //     assert_eq!(
+    //         minimize(&matrix, 4, 4),
+    //         vec![Some(1), Some(3), Some(2), Some(0)]
+    //     );
+    // }
 
-    // From https://stackoverflow.com/questions/37687045/hungarian-algorithm-dead-end
-    #[test]
-    fn test_stack_overflow_6x6() {
-        let matrix = vec![
-            2, 1, 0, 0, 0, 3,
-            2, 0, 4, 5, 2, 7,
-            0, 7, 0, 0, 0, 5,
-            3, 2, 3, 1, 2, 0,
-            0, 0, 6, 3, 3, 5,
-            3, 4, 5, 2, 0, 3,
-        ];
-        assert_eq!(
-            minimize(&matrix, 6, 6),
-            vec![Some(3), Some(1), Some(2), Some(5), Some(0), Some(4)]
-        );
-    }
+    // // From https://stackoverflow.com/questions/17419595/hungarian-kuhn-munkres-algorithm-oddity
+    // #[test]
+    // fn test_stack_overflow_5x5() {
+    //     let matrix = vec![
+    //         0, 7, 0, 0, 0,
+    //         0, 8, 0, 0, 6,
+    //         5, 0, 7, 3, 4,
+    //         5, 0, 5, 9, 3,
+    //         0, 4, 0, 0, 9,
+    //     ];
+    //     assert_eq!(
+    //         3,
+    //         minimize(&matrix, 5, 5)
+    //             .iter()
+    //             .enumerate()
+    //             .filter_map(|(i, &v)| v.map(|j| matrix[index!(5, i, j)]))
+    //             .sum::<i32>()
+    //     );
+    //     assert_eq!(
+    //         minimize(&matrix, 5, 5),
+    //         vec![Some(4), Some(2), Some(3), Some(1), Some(0)]
+    //     );
+    // }
+
+    // // From https://stackoverflow.com/questions/37687045/hungarian-algorithm-dead-end
+    // #[test]
+    // fn test_stack_overflow_6x6() {
+    //     let matrix = vec![
+    //         2, 1, 0, 0, 0, 3,
+    //         2, 0, 4, 5, 2, 7,
+    //         0, 7, 0, 0, 0, 5,
+    //         3, 2, 3, 1, 2, 0,
+    //         0, 0, 6, 3, 3, 5,
+    //         3, 4, 5, 2, 0, 3,
+    //     ];
+    //     assert_eq!(
+    //         minimize(&matrix, 6, 6),
+    //         vec![Some(3), Some(1), Some(2), Some(5), Some(0), Some(4)]
+    //     );
+    // }
 
     // // From https://stackoverflow.com/questions/26893961/cannot-solve-hungarian-algorithm
     // #[test]
@@ -581,7 +640,7 @@ mod tests {
     //             .iter()
     //             .enumerate()
     //             .filter_map(|(i, &v)| v.map(|j| matrix[index!(11, i, j)]))
-    //             .sum::<u64>()
+    //             .sum::<i32>()
     //     );
     // }
 
@@ -599,7 +658,7 @@ mod tests {
     //             .iter()
     //             .enumerate()
     //             .filter_map(|(i, &v)| v.map(|j| matrix[index!(4, i, j)]))
-    //             .sum::<u64>()
+    //             .sum::<i32>()
     //     );
     //     assert_eq!(
     //         minimize(&matrix, 3, 4),
@@ -622,7 +681,7 @@ mod tests {
     //             .iter()
     //             .enumerate()
     //             .filter_map(|(i, &v)| v.map(|j| matrix[index!(5, i, j)]))
-    //             .sum::<u64>()
+    //             .sum::<i32>()
     //     );
     //     assert_eq!(
     //         minimize(&matrix, 4, 5),
@@ -646,7 +705,7 @@ mod tests {
     //             .iter()
     //             .enumerate()
     //             .filter_map(|(i, &v)| v.map(|j| matrix[index!(4, i, j)]))
-    //             .sum::<u64>()
+    //             .sum::<i32>()
     //     );
     //     assert_eq!(
     //         minimize(&matrix, 5, 4),
@@ -658,7 +717,7 @@ mod tests {
     // fn test_rectangle_nx1() {
     //     let max = 100;
     //     for n in 1..max {
-    //         let matrix = (0..n as u64).rev().collect::<Vec<_>>();
+    //         let matrix = (0..n as i32).rev().collect::<Vec<_>>();
     //         let mut expected = vec![None; n];
     //         expected[n - 1] = Some(0);
     //         assert_eq!(minimize(&matrix, n, 1), expected);
@@ -669,45 +728,45 @@ mod tests {
     // fn test_rectangle_1xn() {
     //     let max = 100;
     //     for n in 1..max {
-    //         let matrix = (0..n as u64).rev().collect::<Vec<_>>();
+    //         let matrix = (0..n as i32).rev().collect::<Vec<_>>();
     //         let expected = vec![Some(n - 1)];
     //         assert_eq!(minimize(&matrix, 1, n), expected);
     //     }
     // }
 
-    #[test]
-    fn test_stress() {
-        for max in 1..100 {
-            let mut matrix = vec![0; max * max];
-            let mut n: u64 = 0;
+    // #[test]
+    // fn test_stress() {
+    //     for max in 1..100 {
+    //         let mut matrix = vec![0; max * max];
+    //         let mut n: i32 = 0;
 
-            for i in 0..max {
-                for j in 0..max {
-                    matrix[index!(max, i, j)] = n;
-                    n += 1;
-                }
-            }
+    //         for i in 0..max {
+    //             for j in 0..max {
+    //                 matrix[index!(max, i, j)] = n;
+    //                 n += 1;
+    //             }
+    //         }
 
-            let expected = (0..max).map(|i| Some(i)).rev().collect::<Vec<_>>();
-            assert_eq!(minimize(&matrix, max, max), expected);
-        }
-    }
+    //         let expected = (0..max).map(|i| Some(i)).rev().collect::<Vec<_>>();
+    //         assert_eq!(minimize(&matrix, max, max), expected);
+    //     }
+    // }
 
-    #[test]
-    fn test_worst_case() {
-        for max in 1..50 {
-            let mut matrix = vec![0; max * max];
+    // #[test]
+    // fn test_worst_case() {
+    //     for max in 1..50 {
+    //         let mut matrix = vec![0; max * max];
 
-            for i in 0..max {
-                for j in 0..max {
-                    matrix[index!(max, i, j)] = ((i + 1)*(j + 1)) as u64;
-                }
-            }
+    //         for i in 0..max {
+    //             for j in 0..max {
+    //                 matrix[index!(max, i, j)] = ((i + 1)*(j + 1)) as i32;
+    //             }
+    //         }
 
-            let expected = (0..max).map(|i| Some(i)).rev().collect::<Vec<_>>();
-            assert_eq!(minimize(&matrix, max, max), expected);
-        }
-    }
+    //         let expected = (0..max).map(|i| Some(i)).rev().collect::<Vec<_>>();
+    //         assert_eq!(minimize(&matrix, max, max), expected);
+    //     }
+    // }
 
     // #[test]
     // fn test_large() {
