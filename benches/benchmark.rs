@@ -6,32 +6,37 @@ use criterion::Criterion;
 use hungarian::minimize;
 
 fn bench_hungarian(c: &mut Criterion) {
-    c.bench_function_over_inputs("hungarian_NxN", |b, &&max| {
-        let mut matrix = vec![0; max * max];
-        let mut n: u64 = 0;
-        
-        for i in 0..max {
-            for j in 0..max {
-                matrix[max*i + j] = n;
-                n += 1; 
+    c.bench_function_over_inputs(
+        "hungarian_NxN",
+        |b, &&max| {
+            let mut matrix = vec![0; max * max];
+            let mut n = 0;
+            for i in 0..max {
+                for j in 0..max {
+                    matrix[max * i + j] = n;
+                    n += 1;
+                }
             }
-        }
-        b.iter(move || minimize(&matrix, max, max))
-    }, &[5, 10, 25, 50, 100]);
+            b.iter(move || minimize(&matrix, max, max))
+        },
+        &[5, 10, 25, 50, 100],
+    );
 }
 
 fn bench_hungarian_worst_case(c: &mut Criterion) {
-    c.bench_function_over_inputs("hungarian_worst_case_NxN", |b, &&max| {
-        let mut matrix = vec![0; max * max];
-        
-        for i in 0..max {
-            for j in 0..max {
-                matrix[max*i + j] = ((i + 1)*(j + 1)) as u64;
+    c.bench_function_over_inputs(
+        "hungarian_worst_case_NxN",
+        |b, &&max| {
+            let mut matrix = vec![0; max * max];
+            for i in 0..max {
+                for j in 0..max {
+                    matrix[max * i + j] = ((i + 1) * (j + 1)) as u64;
+                }
             }
-        }
-
-        b.iter(move || minimize(&matrix, max, max))
-    }, &[5, 10, 25, 50]);
+            b.iter(move || minimize(&matrix, max, max))
+        },
+        &[5, 10, 25, 50],
+    );
 }
 
 criterion_group!(benches, bench_hungarian, bench_hungarian_worst_case);
