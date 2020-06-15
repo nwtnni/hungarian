@@ -1,6 +1,6 @@
 [package]
 name = "hungarian"
-version = "1.1.0"
+version = "1.1.1"
 authors = ["Newton Ni <nwtnni@gmail.com>"]
 description = "A simple, fast implementation of the Hungarian (Kuhn-Munkres) algorithm."
 repository = "https://github.com/nwtnni/hungarian"
@@ -14,12 +14,13 @@ travis-ci = { repository = "nwtnni/hungarian" }
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-fixedbitset = "0.1.8"
-num-traits = "0.2.1"
-ndarray = "0.11.1"
+fixedbitset = "0.3"
+ndarray = "0.13"
+num-traits = "0.2"
 
 [dev-dependencies]
-criterion = "0.2"
+criterion = "0.3"
+pathfinding = "2.0"
 
 [[bench]]
 name = "benchmark"
